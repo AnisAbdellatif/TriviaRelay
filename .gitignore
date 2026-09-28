@@ -2,3 +2,6 @@
 erl_crash.dump
 # Local decision log (see AGENTS.md): never committed.
 /decisions.md
+
+# deploy-kit: personal overrides
+.kamal/kit.local.env

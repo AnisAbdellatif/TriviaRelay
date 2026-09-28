@@ -1,0 +1,96 @@
+# The production relay as Kamal runs it (deploy/README.md), from deploy-kit's
+# "behind-caddy" preset: the host's own Caddy keeps 80/443 and TLS, and kamal-proxy,
+# on loopback behind it, swaps the relay's container with no downtime.
+#
+#   Internet ─443─► Caddy (the host's) ─► 127.0.0.1:8080 kamal-proxy ─► web (:4100)
+#
+# The server is FazouraParty's: one Caddy, one kamal-proxy, one deploy user for both.
+#
+# Deployed with deploy-kit (.kamal/, `.kamal/kit/bin/kit deploy`), whose gates run for
+# a plain `kamal` command too. The image is built by CI on main, labelled and attested
+# (.github/workflows/ci.yml), and only ever pulled here: the web app inside it comes
+# from a Flutter build, which Kamal's own builder has no way to produce.
+#
+# The server, its user and the public domain come from the environment
+# (.kamal/kit.local.env, git-ignored; the kit exports it). The relay's secrets never
+# leave the server: the container reads the .env there with --env-file, so the
+# machine that deploys holds nothing but the registry token. Docker reads that file
+# literally — no quotes around values.
+<%
+  host = ENV.fetch("TRIVIA_RELAY_HOST") { raise "TRIVIA_RELAY_HOST isn't set: put the server in .kamal/kit.local.env" }
+  public_host = ENV.fetch("TRIVIA_RELAY_PUBLIC_HOST") { raise "TRIVIA_RELAY_PUBLIC_HOST isn't set: put the domain in .kamal/kit.local.env" }
+  dir = ENV.fetch("TRIVIA_RELAY_DEPLOY_DIR", "/srv/trivia-relay")
+%>
+service: trivia-relay
+image: anisabdellatif/triviarelay
+
+servers:
+  web:
+    hosts: [<%= host %>]
+    options:
+      env-file: <%= dir %>/.env
+      # The same for every other stop: Docker's own on a restart or a reboot.
+      stop-timeout: 30
+    # Seats.Drain tells every phone its seat is closing before the relay stops, and
+    # each seat leaves its Sporcle game. This is how long Kamal's stop waits, when a
+    # deploy replaces the container.
+    stop_timeout: 30
+
+env:
+  clear:
+    # Two proxies append to X-Forwarded-For before the relay reads it — Caddy (the
+    # visitor) and kamal-proxy (Caddy) — so the visitor is the second entry from the
+    # right (TriviaRelayWeb.ClientIp). Honest only because kamal-proxy listens on
+    # loopback and the relay publishes nothing.
+    TRUST_PROXY: "2"
+
+proxy:
+  # kamal-proxy routes on the Host header Caddy passes on.
+  host: <%= public_host %>
+  app_port: 4100
+  # Caddy terminates TLS; kamal-proxy speaks plain HTTP to it and keeps Caddy's
+  # X-Forwarded-For and X-Forwarded-Proto (Phoenix's force_ssl reads the latter).
+  ssl: false
+  forward_headers: true
+  # kamal-proxy moves traffic to a new container once this answers 200. force_ssl
+  # leaves the path alone (config/prod.exs): the check is plain HTTP by container IP.
+  healthcheck:
+    path: /health
+    interval: 3
+    timeout: 3
+  # Responses go straight through: the web build's largest files would otherwise
+  # wait in the proxy until the last byte.
+  buffering:
+    responses: false
+  # One kamal-proxy per server, shared by every Kamal app deployed there: this block
+  # is the server's, not the relay's, and must stay identical to FazouraParty's
+  # (its deploy/deploy.yml). Whichever app boots the proxy decides how it runs.
+  run:
+    http_port: 8080
+    https_port: 8443
+    # Reachable only from this machine, i.e. only through Caddy.
+    bind_ips: [127.0.0.1]
+    # kamal-proxy logs every request with the visitor's address. There is no switch
+    # for that log, so it goes nowhere; the relay's own logs carry no addresses.
+    log_max_size: ""
+    options:
+      log-driver: none
+
+# The token is read-only (read:packages): CI pushes, a deploy only pulls.
+registry:
+  server: ghcr.io
+  username: anisabdellatif
+  password: [KAMAL_REGISTRY_PASSWORD]
+
+builder:
+  arch: amd64
+
+ssh:
+  user: <%= ENV.fetch("TRIVIA_RELAY_SSH_USER", "deploy") %>
+  port: <%= ENV.fetch("TRIVIA_RELAY_SSH_PORT", 22) %>
+
+deploy_timeout: 60
+retain_containers: 5
+
+# Show what each of the kit's gates and steps decided, not only when one fails.
+hooks_output: verbose

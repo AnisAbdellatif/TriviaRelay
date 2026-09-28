@@ -71,12 +71,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       body: FzPage(
         header: Row(
           children: [
+            const FzMark(size: 30),
+            const SizedBox(width: 12),
             Expanded(
               child: FzEyebrow('Signed in as ${account?.handle ?? '…'}'),
             ),
             FzCircleButton(
               key: const Key('settingsButton'),
-              icon: Icons.settings_outlined,
+              icon: Icons.tune,
               tooltip: 'Settings',
               onPressed: () => Navigator.of(
                 context,
@@ -115,13 +117,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 28),
+          padding: const EdgeInsets.only(top: 18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Trivia Relay', style: fz.t(40)),
+              Text('Trivia Relay', style: fz.t(44)),
               const SizedBox(height: 16),
-              Container(width: 78, height: 5, color: FzColors.ac2),
+              const Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FzAccentBars(),
+              ),
               const SizedBox(height: 18),
               Text(
                 'Drop out, come back: your seat, your answers and your '
@@ -133,7 +138,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   height: 1.6,
                 ),
               ),
-              const SizedBox(height: 34),
+              const SizedBox(height: 32),
               const FzEyebrow('Join a game'),
               const SizedBox(height: 10),
               TextField(
@@ -146,11 +151,18 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ],
                 textAlign: TextAlign.center,
                 style: fz.m(30, tracking: .3),
-                decoration: const InputDecoration(hintText: 'Game code'),
+                decoration: InputDecoration(
+                  hintText: 'Game code',
+                  enabledBorder: fzFieldBorder(FzColors.ac),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 16,
+                  ),
+                ),
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => validCode(code) ? _join() : null,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               FzButton(
                 key: const Key('joinButton'),
                 label: _busy ? 'Joining…' : 'Join',

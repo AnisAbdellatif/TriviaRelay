@@ -77,13 +77,15 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            Text('Set up tonight’s game', style: fz.t(34)),
+            const SizedBox(height: 26),
             const FzEyebrow('Pack'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _PackChoice(pack: _pack, onTap: _choosePack),
-            const SizedBox(height: 18),
+            const SizedBox(height: 26),
             const FzEyebrow('Questions'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _Choices<int>(
               keyPrefix: 'questions',
               values: HostOptions.questionsPerGameChoices,
@@ -93,9 +95,9 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
                 () => _options = _options.copyWith(questionsPerGame: n),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 26),
             const FzEyebrow('Seconds per question'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _Choices<int>(
               keyPrefix: 'seconds',
               values: HostOptions.questionSecondsChoices,
@@ -105,9 +107,9 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
                 () => _options = _options.copyWith(questionSeconds: n),
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 26),
             const FzEyebrow('Who can join'),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             _Choices<Audience>(
               keyPrefix: 'audience',
               values: Audience.values,
@@ -156,7 +158,6 @@ class _PackChoice extends StatelessWidget {
       return PackTile(
         pack: pack,
         onTap: onTap,
-        selected: true,
         trailing: Text('Change', style: fz.m(13, color: FzColors.ac)),
       );
     }
@@ -220,14 +221,9 @@ class _Choices<T> extends StatelessWidget {
         for (final value in values)
           ChoiceChip(
             key: Key('$keyPrefix-$value'),
-            label: Text(label(value), style: fz.m(13)),
+            label: Text(label(value), style: fz.m(14)),
             selected: value == selected,
             onSelected: (_) => onSelected(value),
-            selectedColor: FzColors.ac.withValues(alpha: .25),
-            side: BorderSide(
-              color: value == selected ? FzColors.ac : FzColors.line,
-            ),
-            showCheckmark: false,
           ),
       ],
     );

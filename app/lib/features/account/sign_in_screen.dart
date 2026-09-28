@@ -61,13 +61,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           onPressed: _complete && !_busy ? _signIn : null,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 34),
+          padding: const EdgeInsets.only(top: 40),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text('Trivia Relay', style: fz.t(40)),
+              // The mark's box has air on its left; pull it back to the edge.
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Transform.translate(
+                  offset: const Offset(-10, 0),
+                  child: const FzMark(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              Text('Trivia Relay', style: fz.t(44)),
               const SizedBox(height: 16),
-              Container(width: 78, height: 5, color: FzColors.ac2),
+              const Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: FzAccentBars(),
+              ),
               const SizedBox(height: 18),
               Text(
                 'Sporcle Party games that keep your place '
@@ -79,7 +91,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                   height: 1.6,
                 ),
               ),
-              const SizedBox(height: 34),
+              const SizedBox(height: 36),
               const FzEyebrow('Your Sporcle account'),
               const SizedBox(height: 10),
               TextField(
@@ -91,7 +103,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 decoration: const InputDecoration(hintText: 'Email'),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               TextField(
                 key: const Key('passwordField'),
                 controller: _password,
@@ -102,7 +114,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _signIn(),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 16),
               Text(
                 kIsWeb
                     ? 'Your password passes through this app’s relay to '

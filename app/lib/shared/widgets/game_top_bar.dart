@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../theme/fz_theme.dart';
 import 'fz.dart';
 
 /// Top row of the in-room screens: leave button, eyebrow label, optional
@@ -10,9 +11,13 @@ class GameTopBar extends StatelessWidget {
     required this.label,
     required this.onLeave,
     this.trailing,
+    this.color = FzColors.dim,
   });
 
   final String label;
+
+  /// The label's colour: Flare through the final round.
+  final Color color;
   final VoidCallback onLeave;
   final Widget? trailing;
 
@@ -32,7 +37,7 @@ class GameTopBar extends StatelessWidget {
                 onPressed: onLeave,
               ),
               const SizedBox(width: 12),
-              Expanded(child: FzEyebrow(label)),
+              Expanded(child: FzEyebrow(label, color: color)),
               ?trailing,
             ],
           ),

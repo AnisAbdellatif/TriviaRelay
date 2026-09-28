@@ -3,73 +3,238 @@ import 'package:flutter/material.dart';
 import '../theme/fz_theme.dart';
 import 'fz_motion.dart';
 
-/// Deep teal radial glow with the design's amber lattice woven over it.
+/// Flat deep navy with the design's rings spreading from the top corner.
 ///
-/// The lattice is a sibling of [child] behind its own [RepaintBoundary], not
-/// its parent, and that is the whole point: as a parent it shared one layer
-/// with the page, so every tick of the question clock re-recorded ~170
-/// full-height hairlines along with it. On its own layer it is painted once
-/// and composited after that, whatever the page in front of it is doing.
+/// The rings are a sibling of [child] behind their own [RepaintBoundary], not
+/// its parent: as a parent they shared one layer with the page, so every tick
+/// of the question clock re-recorded them along with it. On their own layer
+/// they are painted once and composited after that, whatever the page in
+/// front of them is doing.
 class FzBackground extends StatelessWidget {
-  const FzBackground({super.key, required this.child});
+  const FzBackground({
+    super.key,
+    required this.child,
+    this.arcs = FzColors.arcs,
+  });
 
   final Widget child;
 
+  /// The rings' colour; null draws none.
+  final Color? arcs;
+
+  static const _corner = FzRings(
+    color: FzColors.arcs,
+    first: 90,
+    step: 70,
+    count: 5,
+  );
+
   @override
   Widget build(BuildContext context) {
+    final arcs = this.arcs;
     return Stack(
       // Tight constraints for [child], as it had when it was the painter's
       // child: a Stack loosens its non-positioned children by default, and a
       // loose width would stop every `stretch` Column filling the screen.
       fit: StackFit.expand,
       children: [
-        Positioned.fill(
-          child: RepaintBoundary(
-            child: DecoratedBox(
-              decoration: const BoxDecoration(
-                gradient: RadialGradient(
-                  center: Alignment.topCenter,
-                  radius: 1.3,
-                  colors: [FzColors.bgGlow, FzColors.bgDeep],
-                  stops: [0, 0.68],
-                ),
-              ),
-              child: const CustomPaint(
-                painter: _LatticePainter(),
-                isComplex: true,
-                willChange: false,
-                size: Size.infinite,
-              ),
-            ),
+        const Positioned.fill(child: ColoredBox(color: FzColors.bgDeep)),
+        if (arcs != null)
+          // Centred just off the top right corner, as in the design.
+          Positioned(
+            top: -30 - _corner.radius,
+            right: 10 - _corner.radius,
+            child: RepaintBoundary(child: _corner.withColor(arcs)),
           ),
-        ),
         child,
       ],
     );
   }
 }
 
-/// The design's `--lattice`: amber hairlines crossing at 45°, 26px apart.
-class _LatticePainter extends CustomPainter {
-  const _LatticePainter();
+/// Concentric hairline rings, in a box just big enough for the outermost: the
+/// rings in the corner of every screen, and the ones behind a winner.
+class FzRings extends StatelessWidget {
+  const FzRings({
+    super.key,
+    required this.color,
+    required this.first,
+    required this.step,
+    required this.count,
+  });
 
-  static const _spacing = 26.0;
+  final Color color;
+  final double first;
+  final double step;
+  final int count;
+
+  /// The outermost ring's radius, half the box.
+  double get radius => first + step * (count - 1);
+
+  FzRings withColor(Color color) =>
+      FzRings(color: color, first: first, step: step, count: count);
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: CustomPaint(
+        painter: _RingsPainter(color, first, step, count),
+        isComplex: true,
+        size: Size.square(radius * 2 + 2),
+      ),
+    );
+  }
+}
+
+class _RingsPainter extends CustomPainter {
+  const _RingsPainter(this.color, this.first, this.step, this.count);
+
+  final Color color;
+  final double first;
+  final double step;
+  final int count;
 
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = FzColors.lattice
+      ..color = color
+      ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5;
-
-    for (var x = -size.height; x < size.width + size.height; x += _spacing) {
-      canvas
-        ..drawLine(Offset(x, size.height), Offset(x + size.height, 0), paint)
-        ..drawLine(Offset(x, 0), Offset(x + size.height, size.height), paint);
+    final center = size.center(Offset.zero);
+    for (var i = 0; i < count; i++) {
+      canvas.drawCircle(center, first + step * i, paint);
     }
   }
 
   @override
-  bool shouldRepaint(_LatticePainter oldDelegate) => false;
+  bool shouldRepaint(_RingsPainter old) =>
+      old.color != color ||
+      old.first != first ||
+      old.step != step ||
+      old.count != count;
+}
+
+/// The Trivia Relay mark: a question mark run in two legs, Signal handing on
+/// to Flare, with a seam where one passes the other.
+///
+/// [ground] is the colour behind it, which the seam is cut in. [faded] is the
+/// broken mark of a seat that was let go.
+class FzMark extends StatelessWidget {
+  const FzMark({
+    super.key,
+    this.size = 72,
+    this.ground = FzColors.bgDeep,
+    this.faded = false,
+  });
+
+  final double size;
+  final Color ground;
+  final bool faded;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: CustomPaint(
+        size: Size.square(size),
+        painter: _MarkPainter(ground: ground, faded: faded),
+      ),
+    );
+  }
+}
+
+class _MarkPainter extends CustomPainter {
+  const _MarkPainter({required this.ground, required this.faded});
+
+  final Color ground;
+  final bool faded;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Drawn in the design's 100-unit box, which sits 3 units high.
+    final scale = size.width / 100;
+    canvas
+      ..scale(scale)
+      ..translate(0, -3);
+    // Thinner strokes vanish at launcher-row sizes; the design thickens them.
+    final width = size.width < 40 ? 13.0 : 12.0;
+
+    Paint stroke(Color color, [double? w]) => Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = w ?? width;
+
+    final first = Path()
+      ..moveTo(33.58, 35.6)
+      ..arcToPoint(
+        const Offset(58.5, 25.28),
+        radius: const Radius.circular(17),
+      );
+    Path second(Offset from) => Path()
+      ..moveTo(from.dx, from.dy)
+      ..arcToPoint(
+        const Offset(63.93, 49.75),
+        radius: const Radius.circular(17),
+      )
+      ..cubicTo(58.8, 57.1, 50, 58, 50, 66);
+    const dot = Offset(50, 85);
+
+    if (faded) {
+      final ghost = FzColors.ink.withValues(alpha: .18);
+      canvas
+        ..drawPath(first, stroke(ghost))
+        ..drawPath(
+          second(const Offset(60.5, 29)),
+          stroke(FzColors.ac2.withValues(alpha: .35)),
+        );
+      // The dot, only its dashed outline: nobody is sitting there.
+      final ring = Path()..addOval(Rect.fromCircle(center: dot, radius: 7));
+      final dashes = Path();
+      for (final metric in ring.computeMetrics()) {
+        for (var d = 0.0; d < metric.length; d += 7) {
+          dashes.addPath(metric.extractPath(d, d + 3), Offset.zero);
+        }
+      }
+      canvas.drawPath(dashes, stroke(ghost, 3)..strokeCap = StrokeCap.butt);
+      return;
+    }
+
+    final handOff = second(const Offset(54.4, 23.58));
+    canvas
+      ..drawPath(first, stroke(FzColors.ac))
+      ..drawPath(handOff, stroke(ground, width + 6))
+      ..drawPath(handOff, stroke(FzColors.ac2))
+      ..drawCircle(dot, width / 12 * 7, Paint()..color = FzColors.ac);
+  }
+
+  @override
+  bool shouldRepaint(_MarkPainter old) =>
+      old.ground != ground || old.faded != faded;
+}
+
+/// The two short bars under a title: Signal, then Flare.
+class FzAccentBars extends StatelessWidget {
+  const FzAccentBars({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget bar(double width, Color color) => Container(
+      width: width,
+      height: 5,
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(3),
+      ),
+    );
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        bar(48, FzColors.ac),
+        const SizedBox(width: 6),
+        bar(30, FzColors.ac2),
+      ],
+    );
+  }
 }
 
 /// Phone-width column: scrolling [child] with an optional [footer] pinned to
@@ -145,8 +310,9 @@ class FzPage extends StatelessWidget {
 
 enum FzButtonKind { primary, pink, outline }
 
-/// The design's big rounded buttons. Built on Material buttons so disabled
-/// state and semantics come for free.
+/// The design's big rounded buttons: flat Signal or Flare, or a hairline
+/// outline. Built on Material buttons so disabled state and semantics come for
+/// free.
 class FzButton extends StatelessWidget {
   const FzButton({
     super.key,
@@ -156,6 +322,7 @@ class FzButton extends StatelessWidget {
     this.trailing,
     this.height = 60,
     this.fontSize = 17,
+    this.radius = 16,
     this.expand = true,
   });
 
@@ -167,6 +334,7 @@ class FzButton extends StatelessWidget {
   final String? trailing;
   final double height;
   final double fontSize;
+  final double radius;
   final bool expand;
 
   @override
@@ -178,10 +346,10 @@ class FzButton extends StatelessWidget {
     final fg = !enabled
         ? FzColors.faint
         : filled
-        ? FzColors.bg
+        ? FzColors.bgDeep
         : FzColors.ink;
     final shape = RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(radius),
     );
     final minimumSize = Size(expand ? double.infinity : 0, height);
     const padding = EdgeInsets.symmetric(horizontal: 22);
@@ -213,12 +381,12 @@ class FzButton extends StatelessWidget {
       ],
     );
 
-    final Widget button = filled
+    return filled
         ? FilledButton(
             onPressed: onPressed,
             style: FilledButton.styleFrom(
               backgroundColor: fill,
-              foregroundColor: FzColors.bg,
+              foregroundColor: FzColors.bgDeep,
               disabledBackgroundColor: FzColors.panel,
               disabledForegroundColor: FzColors.faint,
               minimumSize: minimumSize,
@@ -239,22 +407,6 @@ class FzButton extends StatelessWidget {
             ),
             child: content,
           );
-
-    if (!enabled || kind != FzButtonKind.primary) return button;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(color: fill.withValues(alpha: .45), spreadRadius: 1),
-          BoxShadow(
-            color: fill.withValues(alpha: .22),
-            blurRadius: 34,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: button,
-    );
   }
 }
 
@@ -301,7 +453,7 @@ class FzPill extends StatelessWidget {
   }
 }
 
-/// Round 40px outlined icon button (back, leave, profile).
+/// Round 44px outlined icon button (back, leave, settings).
 class FzCircleButton extends StatelessWidget {
   const FzCircleButton({
     super.key,
@@ -321,10 +473,10 @@ class FzCircleButton extends StatelessWidget {
       onPressed: onPressed,
       icon: Icon(icon, size: 18),
       style: IconButton.styleFrom(
-        foregroundColor: FzColors.dim,
-        fixedSize: const Size(40, 40),
-        minimumSize: const Size(40, 40),
-        side: const BorderSide(color: FzColors.line),
+        foregroundColor: FzColors.ink,
+        fixedSize: const Size(44, 44),
+        minimumSize: const Size(44, 44),
+        side: const BorderSide(color: FzColors.line, width: 1.5),
         shape: const CircleBorder(),
       ),
     );
@@ -348,7 +500,7 @@ class FzEyebrow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: FzTheme.of(context).m(size, color: color, tracking: .2),
+      style: FzTheme.of(context).m(size, color: color, tracking: .16),
     );
   }
 }
@@ -364,7 +516,7 @@ class FzTag extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
-      style: FzTheme.of(context).m(10, color: color, tracking: .14),
+      style: FzTheme.of(context).m(10, color: color, tracking: .1),
     );
   }
 }
@@ -447,7 +599,7 @@ class FzAvatar extends StatelessWidget {
       ),
       child: Text(
         initial,
-        style: FzTheme.of(context).h(size * .37, color: FzColors.bg),
+        style: FzTheme.of(context).h(size * .42, color: FzColors.bgDeep),
       ),
     );
   }

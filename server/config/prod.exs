@@ -1,13 +1,15 @@
 import Config
 
 # Force using SSL in production. This also sets the "strict-security-transport" header,
-# known as HSTS. If you have a health check endpoint, you may want to exclude it below.
-# Note `:force_ssl` is required to be set at compile-time.
+# known as HSTS. Note `:force_ssl` is required to be set at compile-time.
 config :trivia_relay, TriviaRelayWeb.Endpoint,
   force_ssl: [
     rewrite_on: [:x_forwarded_proto],
     exclude: [
-      # paths: ["/health"],
+      # kamal-proxy's health check is plain HTTP to the container's own address
+      # (deploy/deploy.yml), and a new container only takes traffic once it answers
+      # 200 — a redirect would fail every deploy.
+      paths: ["/health"],
       hosts: ["localhost", "127.0.0.1"]
     ]
   ]

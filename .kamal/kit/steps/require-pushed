@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# The commit is on the remote deploy branch, so what runs is what everyone
+# can see. KIT_PUSHED_MODE=contained (default): HEAD is on the remote
+# branch; tip: HEAD is exactly its tip. When the version being deployed is
+# another commit (--version), that commit is checked instead of HEAD: the
+# branch the checkout is on says nothing about it.
+. "$(dirname "$0")/_preamble.sh"
+
+kit_sandbox_skip
+
+kit_is_rollback && exit 0
+remote=$(kit_conf KIT_GIT_REMOTE origin)
+mode=$(kit_conf KIT_PUSHED_MODE contained)
+branch=$(git -C "$KIT_PROJECT_DIR" symbolic-ref --quiet --short HEAD || true)
+[ -n "$branch" ] || kit_gate_die "not on a branch (detached HEAD)"
+git -C "$KIT_PROJECT_DIR" fetch --quiet "$remote" "$branch" || kit_die "could not fetch $remote/$branch"
+head=$(git -C "$KIT_PROJECT_DIR" rev-parse HEAD)
+tip=$(git -C "$KIT_PROJECT_DIR" rev-parse "$remote/$branch")
+version=$(kit_version_being_deployed)
+if kit_is_sha "$version"; then
+  case $head in
+    "$version"*) ;;
+    *)
+      head=$(git -C "$KIT_PROJECT_DIR" rev-parse --verify --quiet "$version^{commit}") ||
+        kit_gate_die "version $version isn't a commit known here: fetch it, or deploy from its checkout"
+      ;;
+  esac
+fi
+case $mode in
+  tip) [ "$head" = "$tip" ] || kit_gate_die "$head isn't the tip of $remote/$branch ($tip): push or pull first" ;;
+  contained) git -C "$KIT_PROJECT_DIR" merge-base --is-ancestor "$head" "$tip" ||
+    kit_gate_die "$head isn't on $remote/$branch: push it first" ;;
+  *) kit_die "KIT_PUSHED_MODE must be contained or tip (is '$mode')" ;;
+esac
+kit_ok "pushed to $remote/$branch"

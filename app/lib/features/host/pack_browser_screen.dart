@@ -164,7 +164,7 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                           onPressed: () => Navigator.of(context).pop(),
                         ),
                         const SizedBox(width: 12),
-                        Expanded(child: Text('Pick a pack', style: fz.t(26))),
+                        Expanded(child: Text('Pick a pack', style: fz.t(28))),
                       ],
                     ),
                   ),
@@ -217,13 +217,10 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                               label: Text(_label(list), style: fz.m(13)),
                               selected: list == _list,
                               onSelected: (_) => _choose(list),
-                              selectedColor: FzColors.ac.withValues(alpha: .25),
-                              side: BorderSide(
-                                color: list == _list
-                                    ? FzColors.ac
-                                    : FzColors.line,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 8,
                               ),
-                              showCheckmark: false,
                             ),
                           ),
                       ],

@@ -1,4 +1,4 @@
-# sporcle_relay — spike
+# Trivia Relay — spike
 
 The first step towards a relay between a Fazoura-style app and Sporcle Party's servers.
 The relay would hold each player's GameLift connection, so a phone can drop and come back

@@ -1,0 +1,249 @@
+name: CI
+
+# Every push and pull request runs both suites and builds the image. Only a push to
+# main pushes that image to ghcr.io, labelled for Kamal and with a signed build
+# attestation. CI deploys nothing and holds no server key or relay secret: a person
+# deploys with deploy-kit (`.kamal/kit/bin/kit deploy`), which checks that this
+# workflow passed for the exact commit and that the image carries its attestation
+# (deploy/README.md).
+#
+# A `v*` tag is the other thing that happens here: the same suites run, and then the
+# signed Android APK is built and published as a GitHub release (README, "Releasing
+# the Android app"). Tagging is the only way to cut a release — one path, so a
+# hand-built APK can never be the one people are updating to.
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  # The checks themselves live in scripts/ci.sh, which is also what a developer runs
+  # locally. This workflow only installs toolchains, caches, and calls the script.
+  versions:
+    name: Toolchain versions
+    runs-on: ubuntu-24.04
+    outputs:
+      otp: ${{ steps.read.outputs.otp }}
+      elixir: ${{ steps.read.outputs.elixir }}
+      flutter: ${{ steps.read.outputs.flutter }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # scripts/ci.sh is the single place the pins are written.
+      - id: read
+        run: |
+          sed -n 's/^\([A-Z_]*\)_VERSION="\(.*\)"$/\L\1\E=\2/p' scripts/ci.sh >> "$GITHUB_OUTPUT"
+          cat "$GITHUB_OUTPUT"
+
+  server:
+    name: Server (Elixir)
+    needs: versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: erlef/setup-beam@54075bcc5e249e4758d363f27d099f55d843f124 # v1.24.1
+        with:
+          otp-version: ${{ needs.versions.outputs.otp }}
+          elixir-version: ${{ needs.versions.outputs.elixir }}
+
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            server/deps
+            server/_build
+          key: mix-${{ runner.os }}-${{ needs.versions.outputs.elixir }}-${{ needs.versions.outputs.otp }}-${{ hashFiles('server/mix.lock') }}
+          restore-keys: mix-${{ runner.os }}-${{ needs.versions.outputs.elixir }}-${{ needs.versions.outputs.otp }}-
+
+      - run: scripts/ci.sh server
+
+  app:
+    name: App (Flutter)
+    needs: versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ needs.versions.outputs.flutter }}
+          channel: stable
+          cache: true
+
+      - run: scripts/ci.sh app
+
+      # The image ships this build, so the image job takes it from here rather than
+      # installing Flutter a second time.
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: web
+          path: app/build/web
+          retention-days: 7
+          if-no-files-found: error
+
+  image:
+    name: Image
+    needs: [server, app]
+    # A tag neither publishes an image nor deploys.
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      # The build attestation: signed (Sigstore, keyless) by this workflow, and
+      # checked by the kit's attestation step before a deploy.
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: web
+          path: app/build/web
+
+      - id: name
+        # The full commit sha is the version Kamal deploys (deploy/deploy.yml), and
+        # the only tag: nothing on the server asks for `latest`.
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+
+      # A pull request builds but never publishes: it is here to catch a broken
+      # Dockerfile before main does.
+      - id: publish
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ] && [ "$GITHUB_REF_NAME" = main ]; then
+            echo "push=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "push=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Log in to ghcr.io
+        if: steps.publish.outputs.push == 'true'
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "$TOKEN" | docker login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build the image
+        id: build
+        env:
+          IMAGE: ${{ steps.name.outputs.image }}
+          TAG: ${{ steps.name.outputs.tag }}
+          PUSH: ${{ steps.publish.outputs.push }}
+        # Not scripts/ci.sh: the registry cache and the push are CI's own.
+        # `scripts/ci.sh image` builds the same Dockerfile with the same context.
+        #
+        # A pull request reads the registry cache but does not write it, so it cannot
+        # poison the cache main builds from. The digest is what the attestation below
+        # signs, so it is read from what was pushed rather than trusted from the tag.
+        run: |
+          args=(--file deploy/Dockerfile --cache-from "type=registry,ref=$IMAGE:buildcache")
+          if [ "$PUSH" = true ]; then
+            args+=(--cache-to "type=registry,ref=$IMAGE:buildcache,mode=max")
+            args+=(--push --tag "$IMAGE:$TAG" --metadata-file "$RUNNER_TEMP/build.json")
+          else
+            args+=(--output type=cacheonly)
+          fi
+          docker buildx create --use
+          docker buildx build "${args[@]}" .
+          if [ "$PUSH" = true ]; then
+            digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/build.json")
+            case "$digest" in sha256:*) ;; *) echo "::error::no digest for the pushed image"; exit 1 ;; esac
+            echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Where the image came from, signed. `kit deploy` refuses an image without this
+      # workflow's attestation, so a leaked registry token cannot put one in production.
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        if: steps.publish.outputs.push == 'true'
+        with:
+          subject-name: ${{ steps.name.outputs.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+  release:
+    name: Release (Android)
+    # The whole suite, not just the app one: a tag that ships an APK people install
+    # by hand is the last place to find out the relay was broken.
+    needs: [versions, server, app]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      # Full history so the tag object — and the message that becomes the release
+      # notes — is present. No token left in .git/config: this job's token can write
+      # releases, and the build below runs Gradle plugins and pub packages that have
+      # no business reading it. `gh` gets it from GH_TOKEN.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          flutter-version: ${{ needs.versions.outputs.flutter }}
+          channel: stable
+          cache: true
+
+      - name: Unlock the signing key
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        # Every release has to be signed with the same key or Android refuses to
+        # install one over another. An unset secret fails here with something worth
+        # reading rather than inside Gradle.
+        run: |
+          if [ -z "$KEYSTORE" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 is empty in the 'production' environment. See README.md, 'Releasing the Android app'."
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          chmod 600 "$RUNNER_TEMP/release.jks"
+
+      - name: Build the APK and its manifest
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          # Android is not served from anywhere, so the relay it talks to is baked
+          # in: the domain the relay is deployed at (TRIVIA_RELAY_PUBLIC_HOST to the kit).
+          PUBLIC_HOST: ${{ vars.PUBLIC_HOST }}
+          # scripts/ci.sh refuses to build if this disagrees with app/pubspec.yaml.
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if [ -z "$PUBLIC_HOST" ]; then
+            echo "::error::Set the PUBLIC_HOST repository variable — an APK pointing at localhost cannot reach a game."
+            exit 1
+          fi
+          scripts/ci.sh apk
+
+      - name: Shred the key
+        if: always()
+        run: rm -f "$RUNNER_TEMP/release.jks"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        # android.json is what an installed app reads, fetched through
+        # `releases/latest/download/`, so a pre-release must be marked as one or it
+        # would be offered to everybody. Anything with a suffix (v1.0.0-rc.1) is one.
+        run: |
+          args=(--verify-tag --title "Trivia Relay $TAG" --generate-notes)
+          case "$TAG" in *-*) args+=(--prerelease) ;; esac
+          gh release create "$TAG" "${args[@]}" \
+            app/build/release/*.apk \
+            app/build/release/android.json

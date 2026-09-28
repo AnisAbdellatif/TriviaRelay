@@ -38,9 +38,9 @@ flutter:
   # runtime and silently falls back to system fonts whenever that fails. Shipping
   # them also removes a third-party request from every web page load.
   #
-  # Figtree, Reem Kufi and Noto Naskh Arabic are variable fonts: one file serves
-  # every weight, so each weight below points at the same file and Flutter
-  # interpolates.
+  # Figtree, Bricolage Grotesque and Noto Naskh Arabic are variable fonts:
+  # one file serves every weight, so each weight below points at the same file
+  # and Flutter interpolates.
   fonts:
     - family: Figtree
       fonts:
@@ -56,20 +56,16 @@ flutter:
           weight: 800
         - asset: assets/fonts/Figtree.ttf
           weight: 900
-    - family: Reem Kufi
+    # Screen titles. Its weight axis runs 200–800 and the titles use 800; the
+    # theme sets the axes itself (FzTheme._bricolage).
+    - family: Bricolage Grotesque
       fonts:
-        - asset: assets/fonts/ReemKufi.ttf
-          weight: 400
-        - asset: assets/fonts/ReemKufi.ttf
-          weight: 500
-        - asset: assets/fonts/ReemKufi.ttf
-          weight: 600
-        - asset: assets/fonts/ReemKufi.ttf
-          weight: 700
+        - asset: assets/fonts/BricolageGrotesque.ttf
+          weight: 800
     # Arabic, wherever it turns up: a quiz written in it, a player's name, an
     # answer typed into a phone. Naskh is the shape Arabic is *read* in — the
-    # one books and newspapers use — so it is the one for text. Reem Kufi is a
-    # display face and stays on the headings it was chosen for.
+    # one books and newspapers use — so it is the one for text, and the
+    # fallback behind all three Latin faces.
     #
     # Its weight axis stops at 700, so a heavier heading lands on 700 rather
     # than being faked.

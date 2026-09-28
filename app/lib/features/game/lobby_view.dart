@@ -73,7 +73,7 @@ class LobbyView extends ConsumerWidget {
                   child: Text(
                     state.gameCode,
                     key: const Key('gameCode'),
-                    style: fz.m(40, color: FzColors.ac, tracking: .12),
+                    style: fz.m(44, color: FzColors.ac, tracking: .12),
                   ),
                 ),
               ),
@@ -86,9 +86,10 @@ class LobbyView extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
           if (pack != null)
             FzPanel(
+              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -130,6 +131,7 @@ class LobbyView extends ConsumerWidget {
               label: 'Change the pack',
               kind: FzButtonKind.outline,
               height: 48,
+              fontSize: 15,
               onPressed: () => _changePack(context, ref),
             ),
             const SizedBox(height: 16),
@@ -206,11 +208,6 @@ class _HostOptions extends ConsumerWidget {
             key: Key('$prefix-$value'),
             label: Text(label(value), style: fz.m(12)),
             selected: value == selected,
-            showCheckmark: false,
-            selectedColor: FzColors.ac.withValues(alpha: .25),
-            side: BorderSide(
-              color: value == selected ? FzColors.ac : FzColors.line,
-            ),
             onSelected: (_) =>
                 act(context, ref, (c) => c.options(change(value))),
           ),

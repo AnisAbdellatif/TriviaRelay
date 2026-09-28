@@ -152,19 +152,23 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                 FzTag('${question.difficulty}% get it'),
             ],
           ),
-          const SizedBox(height: 10),
+          const SizedBox(height: 12),
           Countdown(
             deadline: state.deadline,
             pausedRemainingMs: null,
             timeLimitMs: state.options.questionSeconds * 1000,
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 20),
           FzDirection(
             text: question.text,
             child: Text(
               question.text,
               key: const Key('questionText'),
-              style: fz.h(_isShort(question.text) ? 64 : 24, height: 1.3),
+              style: fz.h(
+                _isShort(question.text) ? 64 : 26,
+                height: 1.28,
+                tracking: -.01,
+              ),
             ),
           ),
           if (question.imageUrl != null) ...[
@@ -189,10 +193,12 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
           if (mine != null)
             FzPanel(
               key: const Key('lockedIn'),
+              color: Colors.transparent,
               borderColor: FzColors.ok,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
-                  const Icon(Icons.lock, color: FzColors.ok, size: 18),
+                  const Icon(Icons.lock_outline, color: FzColors.ok, size: 18),
                   const SizedBox(width: 10),
                   Expanded(
                     child: FzDirection(
@@ -215,15 +221,19 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                 controller: _answer,
                 autofocus: true,
                 textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(hintText: 'Your answer'),
+                style: fz.h(18, weight: FontWeight.w700),
+                decoration: InputDecoration(
+                  hintText: 'Your answer',
+                  enabledBorder: fzFieldBorder(FzColors.ac),
+                ),
                 onChanged: (_) => _changed(),
                 onSubmitted: (_) => canSubmit ? _submit() : null,
               ),
             ),
             if (!_final) ...[
-              const SizedBox(height: 16),
+              const SizedBox(height: 18),
               const FzEyebrow('Wager · each once a game'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
@@ -231,13 +241,16 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                   for (final w in state.you.wagerChoices)
                     ChoiceChip(
                       key: Key('wager-$w'),
-                      label: Text('$w', style: fz.m(16)),
-                      selected: w == _wager,
-                      showCheckmark: false,
-                      selectedColor: FzColors.ac.withValues(alpha: .3),
-                      side: BorderSide(
-                        color: w == _wager ? FzColors.ac : FzColors.line,
+                      // At least the design's 48px, however short the number.
+                      label: ConstrainedBox(
+                        constraints: const BoxConstraints(minWidth: 22),
+                        child: Text(
+                          '$w',
+                          textAlign: TextAlign.center,
+                          style: fz.m(16),
+                        ),
                       ),
+                      selected: w == _wager,
                       onSelected: (_) {
                         _wager = w;
                         _changed();

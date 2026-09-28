@@ -22,7 +22,7 @@ class PackImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = this.url;
     final placeholder = ColoredBox(
-      color: FzColors.panel,
+      color: FzColors.bgGlow,
       child: Center(
         child: Icon(
           Icons.quiz_outlined,

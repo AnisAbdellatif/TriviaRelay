@@ -148,7 +148,7 @@ class _CountdownState extends ConsumerState<Countdown> {
                     child: AnimatedContainer(
                       duration: quick,
                       height: finale ? 8 : 5,
-                      color: const Color(0x1AFBF6EC),
+                      color: FzColors.track,
                       alignment: Alignment.centerLeft,
                       child: AnimatedFractionallySizedBox(
                         duration: const Duration(milliseconds: 250),
