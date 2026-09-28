@@ -1,0 +1,1045 @@
+{
+ "_comment": "A real game hosted from the relay's spike (2026-09-27): 5 questions at 15 s, private, both players ours. Every event the HOST's GameLift connection received, in order, with t_ms since the log opened. Account ids, device ids and names replaced. The host restarted the final once by mistake (next_question with toFinalRound after the wagers), then did it right: see SPORCLE.md.",
+ "me": "sporcle_id//hostPlayer",
+ "events": [
+  {
+   "t_ms": 5757,
+   "event": "game_info",
+   "payload": {
+    "allPlayers": [
+     {
+      "appState": "active",
+      "clientVersion": "1.5.15.297",
+      "deviceId": "device-host",
+      "finalWager": null,
+      "hatType": "None",
+      "honksMap": {},
+      "isHost": true,
+      "mascotCustomImageUrl": "",
+      "mascotType": "none",
+      "peerId": 1,
+      "playerId": "sporcle_id//hostPlayer",
+      "readyForGame": true,
+      "readyForNextGame": true,
+      "score": 0,
+      "spectate": false,
+      "sporcleHandle": "Hosta",
+      "teamName": "Hosta"
+     }
+    ],
+    "gameOptions": {
+     "QUESTIONS_PER_GAME": 5,
+     "QUESTION_SECONDS": 15
+    },
+    "gamePack": {
+     "active": true,
+     "bookmarked": false,
+     "creator": {
+      "playerId": "sporcle_id//packAuthor",
+      "sporcleHandle": "pack-author"
+     },
+     "description": " ممنوع تكتب اسمين",
+     "has_images": false,
+     "id": 156070,
+     "img_src": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+     "last_updated": 1736358078,
+     "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+     "num_questions": 169,
+     "owned": false,
+     "play_count": 4182073,
+     "private": false,
+     "subscribed": false,
+     "temp_free": false
+    }
+   }
+  },
+  {
+   "t_ms": 5763,
+   "event": "game_connect",
+   "payload": {
+    "gamePack": {
+     "active": true,
+     "bookmarked": false,
+     "creator": {
+      "playerId": "sporcle_id//packAuthor",
+      "sporcleHandle": "pack-author"
+     },
+     "description": " ممنوع تكتب اسمين",
+     "has_images": false,
+     "id": 156070,
+     "img_src": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+     "last_updated": 1736358078,
+     "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+     "num_questions": 169,
+     "owned": false,
+     "play_count": 4182073,
+     "private": false,
+     "subscribed": false,
+     "temp_free": false
+    },
+    "inLobby": true,
+    "packVotes": {}
+   }
+  },
+  {
+   "t_ms": 80593,
+   "event": "player_connect",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-join",
+     "finalWager": null,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": false,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 2,
+     "playerId": "sporcle_id//joinPlayer",
+     "readyForGame": true,
+     "readyForNextGame": true,
+     "score": 0,
+     "spectate": false,
+     "sporcleHandle": "Joiner",
+     "teamName": "Joiner"
+    }
+   }
+  },
+  {
+   "t_ms": 81381,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-join",
+     "finalWager": null,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": false,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 2,
+     "playerId": "sporcle_id//joinPlayer",
+     "readyForGame": true,
+     "readyForNextGame": true,
+     "score": 0,
+     "spectate": false,
+     "sporcleHandle": "Joiner",
+     "teamName": "Joiner"
+    }
+   }
+  },
+  {
+   "t_ms": 83382,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-host",
+     "finalWager": null,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": true,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 1,
+     "playerId": "sporcle_id//hostPlayer",
+     "readyForGame": true,
+     "readyForNextGame": true,
+     "score": 0,
+     "spectate": false,
+     "sporcleHandle": "Hosta",
+     "teamName": "Hosta"
+    }
+   }
+  },
+  {
+   "t_ms": 83385,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-join",
+     "finalWager": null,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": false,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 2,
+     "playerId": "sporcle_id//joinPlayer",
+     "readyForGame": true,
+     "readyForNextGame": true,
+     "score": 0,
+     "spectate": false,
+     "sporcleHandle": "Joiner",
+     "teamName": "Joiner"
+    }
+   }
+  },
+  {
+   "t_ms": 83473,
+   "event": "game_info",
+   "payload": {
+    "allRounds": [
+     {
+      "percent": "90",
+      "questionIndex": 0
+     },
+     {
+      "percent": "43",
+      "questionIndex": 1
+     },
+     {
+      "percent": "55",
+      "questionIndex": 2
+     },
+     {
+      "percent": "16",
+      "questionIndex": 3
+     },
+     {
+      "percent": "70",
+      "questionIndex": 4
+     },
+     {
+      "percent": "71",
+      "questionIndex": 5
+     },
+     {
+      "percent": "41",
+      "questionIndex": 6
+     },
+     {
+      "percent": "8",
+      "questionIndex": 7
+     }
+    ],
+    "gameOptions": {
+     "QUESTIONS_PER_GAME": 5,
+     "QUESTION_SECONDS": 15
+    },
+    "gamePack": {
+     "active": true,
+     "bookmarked": false,
+     "creator": {
+      "playerId": "sporcle_id//packAuthor",
+      "sporcleHandle": "pack-author"
+     },
+     "description": " ممنوع تكتب اسمين",
+     "has_images": false,
+     "id": 156070,
+     "img_src": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+     "last_updated": 1736358078,
+     "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+     "num_questions": 169,
+     "owned": false,
+     "play_count": 4182073,
+     "private": false,
+     "subscribed": false,
+     "temp_free": false
+    }
+   }
+  },
+  {
+   "t_ms": 83474,
+   "event": "game_question",
+   "payload": {
+    "question": "🇮🇳",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "90",
+    "questionIndex": 0
+   }
+  },
+  {
+   "t_ms": 84398,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 0,
+      "wagerAmount": 2
+     }
+    ],
+    "answer": "الهند",
+    "playerWagers": {
+     "2": false
+    },
+    "questionIndex": 0
+   }
+  },
+  {
+   "t_ms": 84407,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "germany",
+      "peerId": 2,
+      "score": 0,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 2
+     }
+    ],
+    "answer": "الهند",
+    "playerWagers": {
+     "2": false
+    },
+    "questionIndex": 0
+   }
+  },
+  {
+   "t_ms": 87397,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "GameShowAnswer"
+   }
+  },
+  {
+   "t_ms": 89401,
+   "event": "judgement_update",
+   "payload": {
+    "playerJudgements": {
+     "2": true
+    },
+    "questionIndex": 0
+   }
+  },
+  {
+   "t_ms": 90406,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": true,
+      "guessText": "germany",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 2
+     }
+    ],
+    "answer": "الهند",
+    "playerWagers": {
+     "2": false
+    },
+    "questionIndex": 0
+   }
+  },
+  {
+   "t_ms": 90410,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 102835,
+   "event": "game_question",
+   "payload": {
+    "question": "🇧🇩",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "43",
+    "questionIndex": 1
+   }
+  },
+  {
+   "t_ms": 103347,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x1",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y1",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 3
+     }
+    ],
+    "answer": "بنغلاديش",
+    "playerWagers": {
+     "2": false,
+     "3": false
+    },
+    "questionIndex": 1
+   }
+  },
+  {
+   "t_ms": 105350,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "GameShowAnswer"
+   }
+  },
+  {
+   "t_ms": 106853,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x1",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y1",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 3
+     }
+    ],
+    "answer": "بنغلاديش",
+    "playerWagers": {
+     "2": false,
+     "3": false
+    },
+    "questionIndex": 1
+   }
+  },
+  {
+   "t_ms": 106863,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 107365,
+   "event": "game_question",
+   "payload": {
+    "question": "🇦🇴",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "55",
+    "questionIndex": 2
+   }
+  },
+  {
+   "t_ms": 107880,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x2",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y2",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 4
+     }
+    ],
+    "answer": "انغولا",
+    "playerWagers": {
+     "2": false,
+     "3": false,
+     "4": false
+    },
+    "questionIndex": 2
+   }
+  },
+  {
+   "t_ms": 109882,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "GameShowAnswer"
+   }
+  },
+  {
+   "t_ms": 111386,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x2",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y2",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 4
+     }
+    ],
+    "answer": "انغولا",
+    "playerWagers": {
+     "2": false,
+     "3": false,
+     "4": false
+    },
+    "questionIndex": 2
+   }
+  },
+  {
+   "t_ms": 111387,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 111899,
+   "event": "game_question",
+   "payload": {
+    "question": "🇸🇱",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "16",
+    "questionIndex": 3
+   }
+  },
+  {
+   "t_ms": 112414,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x3",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y3",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 5
+     }
+    ],
+    "answer": "سيراليون",
+    "playerWagers": {
+     "2": false,
+     "3": false,
+     "4": false,
+     "5": false
+    },
+    "questionIndex": 3
+   }
+  },
+  {
+   "t_ms": 114416,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "GameShowAnswer"
+   }
+  },
+  {
+   "t_ms": 115919,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x3",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y3",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 5
+     }
+    ],
+    "answer": "سيراليون",
+    "playerWagers": {
+     "2": false,
+     "3": false,
+     "4": false,
+     "5": false
+    },
+    "questionIndex": 3
+   }
+  },
+  {
+   "t_ms": 115921,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 116433,
+   "event": "game_question",
+   "payload": {
+    "question": "🇸🇾",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "70",
+    "questionIndex": 4
+   }
+  },
+  {
+   "t_ms": 116943,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "y4",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     }
+    ],
+    "answer": "سوريا",
+    "playerWagers": {
+     "1": false,
+     "2": false,
+     "3": false,
+     "4": false,
+     "5": false
+    },
+    "questionIndex": 4
+   }
+  },
+  {
+   "t_ms": 116946,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x4",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y4",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 1
+     }
+    ],
+    "answer": "سوريا",
+    "playerWagers": {
+     "1": false,
+     "2": false,
+     "3": false,
+     "4": false,
+     "5": false
+    },
+    "questionIndex": 4
+   }
+  },
+  {
+   "t_ms": 118946,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "GameShowAnswer"
+   }
+  },
+  {
+   "t_ms": 120451,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "x4",
+      "peerId": 2,
+      "score": 1,
+      "sortIndex": 0,
+      "wagerAmount": 1
+     },
+     {
+      "correct": false,
+      "guessText": "y4",
+      "peerId": 1,
+      "score": 0,
+      "sortIndex": 1,
+      "wagerAmount": 1
+     }
+    ],
+    "answer": "سوريا",
+    "playerWagers": {
+     "1": false,
+     "2": false,
+     "3": false,
+     "4": false,
+     "5": false
+    },
+    "questionIndex": 4
+   }
+  },
+  {
+   "t_ms": 120452,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 130355,
+   "event": "game_question",
+   "payload": {
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 130865,
+   "event": "vote_final_round",
+   "payload": {
+    "finalVotes": {
+     "hard": 1
+    },
+    "votedPlayers": {
+     "sporcle_id//joinPlayer": "hard"
+    }
+   }
+  },
+  {
+   "t_ms": 131868,
+   "event": "vote_final_round",
+   "payload": {
+    "finalVotes": {
+     "easy": 1,
+     "hard": 1
+    },
+    "votedPlayers": {
+     "sporcle_id//joinPlayer": "hard",
+     "sporcle_id//hostPlayer": "easy"
+    }
+   }
+  },
+  {
+   "t_ms": 131869,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "CAST_WAGER",
+    "pickedVote": "easy",
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 143970,
+   "event": "list_final_wagers",
+   "payload": {
+    "allPlayerFinalWagers": [
+     {
+      "finalWager": 10,
+      "peerId": 2
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 144971,
+   "event": "list_final_wagers",
+   "payload": {
+    "allPlayerFinalWagers": [
+     {
+      "finalWager": 20,
+      "peerId": 1
+     },
+     {
+      "finalWager": 10,
+      "peerId": 2
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 173791,
+   "event": "game_question",
+   "payload": {
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 263849,
+   "event": "list_final_wagers",
+   "payload": {
+    "allPlayerFinalWagers": [
+     {
+      "finalWager": 20,
+      "peerId": 1
+     },
+     {
+      "finalWager": 10,
+      "peerId": 2
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 263850,
+   "event": "list_final_wagers",
+   "payload": {
+    "allPlayerFinalWagers": [
+     {
+      "finalWager": 20,
+      "peerId": 1
+     },
+     {
+      "finalWager": 10,
+      "peerId": 2
+     }
+    ]
+   }
+  },
+  {
+   "t_ms": 266853,
+   "event": "game_question",
+   "payload": {
+    "question": "🇩🇰",
+    "questionCategory": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "questionDifficulty": "71",
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 276781,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": -20,
+      "sortIndex": 0,
+      "wagerAmount": 20
+     }
+    ],
+    "answer": "دنمارك",
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 276782,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": false,
+      "guessText": "denmark",
+      "peerId": 2,
+      "score": -9,
+      "sortIndex": 0,
+      "wagerAmount": 10
+     },
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": -20,
+      "sortIndex": 1,
+      "wagerAmount": 20
+     }
+    ],
+    "answer": "دنمارك",
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 278784,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "showAnswer"
+   }
+  },
+  {
+   "t_ms": 280788,
+   "event": "judgement_update",
+   "payload": {
+    "playerJudgements": {
+     "2": true
+    },
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 281792,
+   "event": "list_answers",
+   "payload": {
+    "allPlayerAnswers": [
+     {
+      "correct": true,
+      "guessText": "denmark",
+      "peerId": 2,
+      "score": 11,
+      "sortIndex": 0,
+      "wagerAmount": 10
+     },
+     {
+      "correct": false,
+      "guessText": "nope",
+      "peerId": 1,
+      "score": -20,
+      "sortIndex": 1,
+      "wagerAmount": 20
+     }
+    ],
+    "answer": "دنمارك",
+    "questionIndex": 5
+   }
+  },
+  {
+   "t_ms": 281796,
+   "event": "judged_answers",
+   "payload": null
+  },
+  {
+   "t_ms": 284795,
+   "event": "advance_all",
+   "payload": {
+    "currentView": "score"
+   }
+  },
+  {
+   "t_ms": 297838,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-host",
+     "finalWager": 20,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": true,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 1,
+     "playerId": "sporcle_id//hostPlayer",
+     "readyForGame": false,
+     "readyForNextGame": false,
+     "score": -20,
+     "spectate": false,
+     "sporcleHandle": "Hosta",
+     "teamName": "Hosta"
+    }
+   }
+  },
+  {
+   "t_ms": 297843,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-join",
+     "finalWager": 10,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": false,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 2,
+     "playerId": "sporcle_id//joinPlayer",
+     "readyForGame": false,
+     "readyForNextGame": false,
+     "score": 11,
+     "spectate": false,
+     "sporcleHandle": "Joiner",
+     "teamName": "Joiner"
+    }
+   }
+  },
+  {
+   "t_ms": 297843,
+   "event": "player_update",
+   "payload": {
+    "player": {
+     "appState": "active",
+     "clientVersion": "1.5.15.297",
+     "deviceId": "device-host",
+     "finalWager": 20,
+     "hatType": "None",
+     "honksMap": {},
+     "isHost": true,
+     "mascotCustomImageUrl": "",
+     "mascotType": "none",
+     "peerId": 1,
+     "playerId": "sporcle_id//hostPlayer",
+     "readyForGame": true,
+     "readyForNextGame": true,
+     "score": -20,
+     "spectate": false,
+     "sporcleHandle": "Hosta",
+     "teamName": "Hosta"
+    }
+   }
+  },
+  {
+   "t_ms": 297843,
+   "event": "next_game",
+   "payload": {
+    "gamePack": {
+     "active": true,
+     "bookmarked": false,
+     "creator": {
+      "playerId": "sporcle_id//packAuthor",
+      "sporcleHandle": "pack-author"
+     },
+     "description": " ممنوع تكتب اسمين",
+     "has_images": false,
+     "id": 156070,
+     "img_src": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+     "last_updated": 1736358078,
+     "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+     "num_questions": 169,
+     "owned": false,
+     "play_count": 4182073,
+     "private": false,
+     "subscribed": false,
+     "temp_free": false
+    },
+    "packVotes": {}
+   }
+  }
+ ]
+}

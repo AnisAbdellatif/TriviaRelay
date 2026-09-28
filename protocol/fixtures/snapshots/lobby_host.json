@@ -1,0 +1,65 @@
+{
+  "status": "live",
+  "options": {
+    "question_seconds": 15,
+    "questions_per_game": 5
+  },
+  "deadline": null,
+  "final": null,
+  "phase": "lobby",
+  "protocol_version": 1,
+  "question": null,
+  "rounds": [],
+  "players": [
+    {
+      "connected": true,
+      "name": "Hosta",
+      "host": true,
+      "peer_id": 1,
+      "ready": true,
+      "score": 0,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    },
+    {
+      "connected": true,
+      "name": "Joiner",
+      "host": false,
+      "peer_id": 2,
+      "ready": true,
+      "score": 0,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    }
+  ],
+  "reveal": null,
+  "pack": {
+    "id": 156070,
+    "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "description": " ممنوع تكتب اسمين",
+    "image_url": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+    "has_images": false,
+    "num_questions": 169
+  },
+  "game_code": "624949",
+  "protocol_minor": 1,
+  "server_time": 1790000000000,
+  "you": {
+    "host": true,
+    "judged": false,
+    "judgements": {},
+    "peer_id": 1,
+    "played_again": false,
+    "answer": null,
+    "can_reveal": false,
+    "wager_choices": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+.elixir_ls/
+erl_crash.dump
+# Local decision log (see AGENTS.md): never committed.
+/decisions.md

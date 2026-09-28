@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "relay",
+      "runtimeExecutable": "bash",
+      "runtimeArgs": ["-c", "WEB_DIR=../app/build/web mix phx.server"],
+      "port": 4100,
+      "cwd": "server"
+    }
+  ]
+}

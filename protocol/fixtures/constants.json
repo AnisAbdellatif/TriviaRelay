@@ -1,0 +1,13 @@
+{
+  "_comment": "Every fixed number the relay and the app share (PROTOCOL.md). Each side's tests require its own constants to equal this file: change one here and in both.",
+  "protocol_version": "1.1",
+  "broadcast_interval_ms": 100,
+  "vote_ms": 15000,
+  "wager_ms": 30000,
+  "final_wagers": [0, 10, 20],
+  "questions_per_game": [5, 10, 15, 20],
+  "question_seconds": [15, 30, 45, 60],
+  "audiences": ["private", "friends", "anyone"],
+  "final_votes": ["easy", "medium", "hard"],
+  "pack_lists": ["popular", "fresh", "bookmarked", "created", "friends", "purchased", "free", "all"]
+}

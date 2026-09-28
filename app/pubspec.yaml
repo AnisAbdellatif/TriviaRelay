@@ -1,0 +1,92 @@
+name: trivia_relay
+description: "Trivia Relay: plays Sporcle Party games through a relay that keeps your place when your phone drops. Android and Web."
+publish_to: 'none'
+version: 0.1.0+1
+
+environment:
+  sdk: ^3.13.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_riverpod: ^3.4.3
+  freezed_annotation: ^3.1.0
+  http: ^1.6.0
+  json_annotation: ^4.12.0
+  phoenix_socket: ^0.8.0
+  riverpod_annotation: ^4.0.7
+  shared_preferences: ^2.5.5
+  # Android-only in practice: handing the APK download off to the browser is the
+  # whole of the update install step (core/update/). The web build never calls it.
+  url_launcher: ^6.3.2
+  # Web-only: the origin the web app was served from (core/providers/served_origin_web.dart).
+  web: ^1.1.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+  build_runner: ^2.16.1
+  riverpod_generator: ^4.0.9
+  freezed: ^4.0.1
+  json_serializable: ^6.14.1
+
+flutter:
+  uses-material-design: true
+
+  # Bundled, not fetched: google_fonts downloads these from fonts.gstatic.com at
+  # runtime and silently falls back to system fonts whenever that fails. Shipping
+  # them also removes a third-party request from every web page load.
+  #
+  # Figtree, Reem Kufi and Noto Naskh Arabic are variable fonts: one file serves
+  # every weight, so each weight below points at the same file and Flutter
+  # interpolates.
+  fonts:
+    - family: Figtree
+      fonts:
+        - asset: assets/fonts/Figtree.ttf
+          weight: 400
+        - asset: assets/fonts/Figtree.ttf
+          weight: 500
+        - asset: assets/fonts/Figtree.ttf
+          weight: 600
+        - asset: assets/fonts/Figtree.ttf
+          weight: 700
+        - asset: assets/fonts/Figtree.ttf
+          weight: 800
+        - asset: assets/fonts/Figtree.ttf
+          weight: 900
+    - family: Reem Kufi
+      fonts:
+        - asset: assets/fonts/ReemKufi.ttf
+          weight: 400
+        - asset: assets/fonts/ReemKufi.ttf
+          weight: 500
+        - asset: assets/fonts/ReemKufi.ttf
+          weight: 600
+        - asset: assets/fonts/ReemKufi.ttf
+          weight: 700
+    # Arabic, wherever it turns up: a quiz written in it, a player's name, an
+    # answer typed into a phone. Naskh is the shape Arabic is *read* in — the
+    # one books and newspapers use — so it is the one for text. Reem Kufi is a
+    # display face and stays on the headings it was chosen for.
+    #
+    # Its weight axis stops at 700, so a heavier heading lands on 700 rather
+    # than being faked.
+    - family: Noto Naskh Arabic
+      fonts:
+        - asset: assets/fonts/NotoNaskhArabic.ttf
+          weight: 400
+        - asset: assets/fonts/NotoNaskhArabic.ttf
+          weight: 500
+        - asset: assets/fonts/NotoNaskhArabic.ttf
+          weight: 600
+        - asset: assets/fonts/NotoNaskhArabic.ttf
+          weight: 700
+    # DM Mono ships as static weights; the design uses regular and medium.
+    - family: DM Mono
+      fonts:
+        - asset: assets/fonts/DMMono-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/DMMono-Medium.ttf
+          weight: 500
