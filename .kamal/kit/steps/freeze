@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Refuses to deploy while frozen: KIT_FREEZE=true, or a file .kamal/FREEZE
+# (all destinations) or .kamal/FREEZE.<destination>, whose content is shown
+# as the reason. Rollbacks stay allowed (KIT_FREEZE_ALLOWS_ROLLBACK). The
+# files count here and, committed, on the remote branch (fetched): a
+# checkout from before the freeze was pushed is frozen too.
+. "$(dirname "$0")/_preamble.sh"
+
+kit_sandbox_skip
+
+if kit_is_rollback && kit_is_true "$(kit_conf KIT_FREEZE_ALLOWS_ROLLBACK true)"; then exit 0; fi
+for file in "$KIT_CONFIG_DIR/FREEZE" ${KIT_DESTINATION:+"$KIT_CONFIG_DIR/FREEZE.$KIT_DESTINATION"}; do
+  if [ -f "$file" ]; then
+    reason=$(head -c 500 "$file" | tr '\n' ' ' | sed 's/ *$//')
+    kit_gate_die "deploys are frozen (${file#"$KIT_PROJECT_DIR"/})${reason:+: $reason}; kit unfreeze lifts it"
+  fi
+done
+kit_is_true "$(kit_conf KIT_FREEZE false)" && kit_gate_die "deploys are frozen (KIT_FREEZE)"
+
+# The remote branch's files (the checkout's branch), when there's a remote.
+remote=$(kit_conf KIT_GIT_REMOTE origin)
+branch=$(git -C "$KIT_PROJECT_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+if [ -n "$branch" ] && git -C "$KIT_PROJECT_DIR" remote get-url "$remote" >/dev/null 2>&1; then
+  git -C "$KIT_PROJECT_DIR" fetch --quiet "$remote" "$branch" 2>/dev/null ||
+    kit_warn "freeze: could not fetch $remote/$branch; checking what was last fetched"
+  rel=${KIT_CONFIG_DIR#"$KIT_PROJECT_DIR"/}
+  for name in FREEZE ${KIT_DESTINATION:+"FREEZE.$KIT_DESTINATION"}; do
+    if reason=$(git -C "$KIT_PROJECT_DIR" show "$remote/$branch:$rel/$name" 2>/dev/null); then
+      reason=$(printf '%s' "$reason" | head -c 500 | tr '\n' ' ' | sed 's/ *$//')
+      kit_gate_die "deploys are frozen ($rel/$name on $remote/$branch)${reason:+: $reason}"
+    fi
+  done
+fi
+exit 0

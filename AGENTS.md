@@ -22,13 +22,21 @@ on GitHub, not on Google Play.
   `server/logs/`, both git-ignored).
 - `app/`: the Flutter app, Android + Web, built from FazouraParty's app
   (`~/dev/FazouraParty/app`).
+- `deploy/`, `.kamal/`: the image and the Kamal config, deployed with deploy-kit to
+  FazouraParty's VPS (`deploy/README.md`). `.kamal/kit/` is vendored: change it only with
+  `kit update`.
+- `scripts/ci.sh`: every check CI runs, runnable locally; `.github/workflows/ci.yml` only
+  calls it.
 
 ## 2. Git
 
 - Work on `dev`; `main` is what gets released. Open a PR to `main` only when a set of changes
   is done and tested.
 - Never commit without the owner asking. Never add an AI as author or co-author.
-- Never commit credentials, tokens, frame logs or `decisions.md`.
+- Never commit credentials, tokens, frame logs, `decisions.md`, `.kamal/kit.local.env` or a
+  signing key.
+- Never deploy, push a tag or publish a release without the owner asking. CI never deploys;
+  a person runs `kit deploy` from `main`.
 
 ## 3. The contracts
 
@@ -72,7 +80,7 @@ on GitHub, not on Google Play.
   and strangers join within seconds; the spike console requires `--audience` for the same
   reason.
 - Must pass: `mix format --check-formatted`, `mix compile --warnings-as-errors`,
-  `mix credo --strict`, `mix test`.
+  `mix credo --strict`, `mix test` (all of them: `scripts/ci.sh server`).
 
 ## 5. The app
 
@@ -92,7 +100,8 @@ on GitHub, not on Google Play.
   button leaves.
 - Agents test the app on the Web build only (`flutter test`, `flutter build web`). Never
   drive the Android emulator.
-- Must pass: `dart format --set-exit-if-changed`, `flutter analyze`, `flutter test`.
+- Must pass: `dart format --set-exit-if-changed`, `flutter analyze`, `flutter test` (all of
+  them, and the web build: `scripts/ci.sh app`).
 
 ## 6. Decision log
 

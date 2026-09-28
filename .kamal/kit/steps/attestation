@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+# The image being deployed carries a GitHub build attestation from this
+# repository (and, with KIT_ATTESTATION_SIGNER_WORKFLOW, from that
+# workflow). For images built by CI and deployed with --skip-push: an image
+# pushed by anything else (a leaked registry token, a compromised runner of
+# another workflow) is refused. And it must have been built from the commit
+# being deployed, on the branch deployed from: an attested image of another
+# commit, retagged, is refused too. docs/security.md. With several images,
+# KIT_IMAGE_<SERVICE> per Kamal service.
+. "$(dirname "$0")/_preamble.sh"
+
+kit_sandbox_skip
+
+kit_require gh "GitHub's CLI, logged in: gh auth login"
+# Per Kamal service first (a project with several images):
+# KIT_IMAGE_<SERVICE>, e.g. KIT_IMAGE_MYAPP_WORKER for service myapp-worker.
+image=""
+[ -z "${KAMAL_SERVICE:-}" ] || image=$(kit_conf "KIT_IMAGE_$(kit_upper "$KAMAL_SERVICE")" "")
+[ -n "$image" ] || image=$(kit_conf KIT_IMAGE "")
+[ -n "$image" ] || kit_die "set KIT_IMAGE (e.g. ghcr.io/owner/app) to verify attestations"
+version=$(kit_version_being_deployed)
+repo=$(kit_conf KIT_GITHUB_REPO "")
+[ -n "$repo" ] || repo=$(cd "$KIT_PROJECT_DIR" && gh repo view --json nameWithOwner -q .nameWithOwner) ||
+  kit_die "could not tell the GitHub repository: set KIT_GITHUB_REPO=owner/repo"
+
+args=(attestation verify "oci://$image:$version" --repo "$repo")
+signer=$(kit_conf KIT_ATTESTATION_SIGNER_WORKFLOW "")
+[ -n "$signer" ] && args+=(--signer-workflow "$signer")
+# Built from this very commit (Kamal's version is the commit id).
+if kit_is_true "$(kit_conf KIT_ATTESTATION_SOURCE_DIGEST true)"; then
+  [[ $version =~ ^[0-9a-f]{40}$ ]] ||
+    kit_die "version '$version' isn't a full commit id: can't check the image was built from it (KIT_ATTESTATION_SOURCE_DIGEST=false to not check)"
+  args+=(--source-digest "$version")
+fi
+# From the branch deployed from (its ref when CI built it): the
+# checkout's, unless KIT_ATTESTATION_SOURCE_REF says (none: any).
+source_ref=$(kit_conf KIT_ATTESTATION_SOURCE_REF "")
+if [ -z "$source_ref" ]; then
+  branch=$(git -C "$KIT_PROJECT_DIR" symbolic-ref --quiet --short HEAD 2>/dev/null || true)
+  [ -z "$branch" ] || source_ref="refs/heads/$branch"
+fi
+[ -z "$source_ref" ] || [ "$source_ref" = none ] || args+=(--source-ref "$source_ref")
+kit_is_true "$(kit_conf KIT_ATTESTATION_DENY_SELF_HOSTED true)" && args+=(--deny-self-hosted-runners)
+read -r -a extra <<<"$(kit_conf KIT_ATTESTATION_ARGS "")"
+args+=(${extra[@]+"${extra[@]}"})
+
+if gh "${args[@]}" >/dev/null; then
+  kit_ok "attestation verified for $image:$version"
+else
+  kit_die "no valid attestation for $image:$version from $repo${signer:+ ($signer)}: not deploying it"
+fi
