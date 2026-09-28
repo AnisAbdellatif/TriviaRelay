@@ -77,7 +77,9 @@ on GitHub, not on Google Play.
 ## 5. The app
 
 - Built from FazouraParty's app:
-  - its theme, fonts, `Fz*` widgets, motion and navigation (`lib/shared/`);
+  - its `Fz*` widgets, motion and navigation (`lib/shared/`), restyled to the Trivia Relay
+    design canvas (https://claude.ai/artifact/Paezq4BHSeaUd4XLqfiZTt): its own palette,
+    fonts and mark;
   - the Phoenix connection pattern (`PhoenixSeatConnection`);
   - the update mechanism (`lib/core/update/`).
   Follow that app's conventions: Riverpod + freezed, feature-first folders, `reduceMotion`,

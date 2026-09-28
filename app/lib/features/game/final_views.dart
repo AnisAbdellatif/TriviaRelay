@@ -49,14 +49,14 @@ class FinalVoteView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Text('Final round', style: fz.t(34)),
-          const SizedBox(height: 8),
+          Text('Final round', style: fz.t(40)),
+          const SizedBox(height: 10),
           Text(
             'One last question, and you wager 0, 10 or 20 on it. A wrong '
             'answer costs what you wagered. First: how hard should it be?',
-            style: fz.m(14, color: FzColors.dim, height: 1.5),
+            style: fz.m(15, color: FzColors.dim, height: 1.55),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Countdown(
             deadline: state.deadline,
             pausedRemainingMs: null,
@@ -105,51 +105,51 @@ class FinalWagerView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Text('Your wager', style: fz.t(34)),
-          const SizedBox(height: 8),
+          Text('Your wager', style: fz.t(40)),
+          const SizedBox(height: 10),
           Text(
             picked == null
                 ? 'Right adds it, wrong takes it away.'
                 : 'The final question is $picked. Right adds your wager, '
                       'wrong takes it away.',
-            style: fz.m(14, color: FzColors.dim, height: 1.5),
+            style: fz.m(15, color: FzColors.dim, height: 1.55),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
           Countdown(
             deadline: state.deadline,
             pausedRemainingMs: null,
             timeLimitMs: 30000,
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 24),
           Row(
             children: [
-              for (final amount in state.you.wagerChoices)
+              for (final (i, amount) in state.you.wagerChoices.indexed) ...[
+                if (i > 0) const SizedBox(width: 8),
                 Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: FzButton(
-                      key: Key('finalWager-$amount'),
-                      label: '$amount',
-                      kind: mine == amount
-                          ? FzButtonKind.pink
-                          : FzButtonKind.outline,
-                      onPressed: mine == null
-                          ? () => act(context, ref, (c) => c.finalWager(amount))
-                          : null,
-                    ),
+                  child: _WagerTile(
+                    key: Key('finalWager-$amount'),
+                    amount: amount,
+                    chosen: mine == amount,
+                    onPressed: mine == null
+                        ? () => act(context, ref, (c) => c.finalWager(amount))
+                        : null,
                   ),
                 ),
+              ],
             ],
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 26),
           const FzEyebrow('Standings'),
-          const SizedBox(height: 6),
-          for (final player in state.standings)
+          const SizedBox(height: 4),
+          for (final (rank, player) in state.standings.indexed)
             PlayerRow(
               player: player,
               you: player.peerId == state.you.peerId,
               note: player.finalWagered ? 'wagered' : null,
-              trailing: Text('${player.score}', style: fz.m(20)),
+              trailing: Text(
+                '${player.score}',
+                style: fz.m(20, color: rank == 0 ? FzColors.ac : FzColors.ink),
+              ),
             ),
         ],
       ),
@@ -186,9 +186,12 @@ class FinalScoresView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
-          const FzEyebrow('Final scores'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 22),
+          if (winners.isNotEmpty)
+            Center(child: _Winners(winners: winners.take(3).toList())),
+          const SizedBox(height: 14),
+          const Center(child: FzEyebrow('Final scores')),
+          const SizedBox(height: 14),
           Text(
             winners.isEmpty
                 ? 'Game over'
@@ -196,12 +199,120 @@ class FinalScoresView extends ConsumerWidget {
                 ? '${winners.first.name} wins'
                 : '${winners.map((p) => p.name).join(' & ')} tie',
             key: const Key('winner'),
-            style: fz.t(34, color: FzColors.ac),
+            textAlign: TextAlign.center,
+            style: fz.t(48, color: FzColors.ac),
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 14),
+          const Center(child: FzAccentBars()),
+          const SizedBox(height: 30),
           Standings(state: state),
         ],
       ),
+    );
+  }
+}
+
+/// One of the final wager's three big choices: a hairline tile that turns
+/// Flare when it's the one.
+class _WagerTile extends StatelessWidget {
+  const _WagerTile({
+    super.key,
+    required this.amount,
+    required this.chosen,
+    required this.onPressed,
+  });
+
+  final int amount;
+  final bool chosen;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final fz = FzTheme.of(context);
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(88),
+        padding: EdgeInsets.zero,
+        backgroundColor: chosen
+            ? FzColors.ac2.withValues(alpha: .14)
+            : Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        side: BorderSide(
+          color: chosen ? FzColors.ac2 : FzColors.line,
+          width: 1.5,
+        ),
+      ),
+      child: Text(
+        '$amount',
+        style: fz.m(
+          34,
+          weight: FontWeight.w400,
+          // Once one is chosen the others fade; the chosen one stays bright.
+          color: onPressed == null && !chosen ? FzColors.faint : FzColors.ink,
+        ),
+      ),
+    );
+  }
+}
+
+/// The winner, or those tied, large and ringed in Signal, with rings spreading
+/// behind.
+class _Winners extends StatelessWidget {
+  const _Winners({required this.winners});
+
+  final List<PlayerView> winners;
+
+  static const _rings = FzRings(
+    color: Color(0x1AFFD23F),
+    first: 70,
+    step: 60,
+    count: 6,
+  );
+
+  @override
+  Widget build(BuildContext context) {
+    final size = winners.length == 1 ? 96.0 : 72.0;
+    return Stack(
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        Positioned(
+          left: -_rings.radius,
+          right: -_rings.radius,
+          top: -_rings.radius,
+          bottom: -_rings.radius,
+          child: const Center(child: _rings),
+        ),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (i, player) in winners.indexed) ...[
+              if (i > 0) const SizedBox(width: 18),
+              // A gap of page, then a Signal ring.
+              Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: FzColors.ac,
+                ),
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: FzColors.bgDeep,
+                  ),
+                  child: FzAvatar(
+                    id: '${player.peerId}',
+                    name: player.name,
+                    size: size,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ],
     );
   }
 }

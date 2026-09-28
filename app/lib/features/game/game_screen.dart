@@ -80,12 +80,14 @@ class GameScreen extends ConsumerWidget {
       },
       child: Scaffold(
         body: FzBackground(
+          arcs: closed == null ? _arcs(state) : null,
           child: SafeArea(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 GameTopBar(
                   label: _label(state),
+                  color: _finalRound(state) ? FzColors.ac2 : FzColors.dim,
                   onLeave: closed != null
                       ? () => goHome(context)
                       : () => _leave(context, ref),
@@ -102,6 +104,21 @@ class GameScreen extends ConsumerWidget {
         ),
       ),
     );
+  }
+
+  static bool _finalRound(SeatState? state) => switch (state?.phase) {
+    Phase.finalVote ||
+    Phase.finalWager ||
+    Phase.finalQuestion ||
+    Phase.finalReveal => true,
+    _ => false,
+  };
+
+  /// Signal rings in the corner; Flare through the final round; none behind
+  /// the final scores, which ring the winner instead.
+  static Color? _arcs(SeatState? state) {
+    if (state?.phase == Phase.finalScores) return null;
+    return _finalRound(state) ? FzColors.flareArcs : FzColors.arcs;
   }
 
   static String _label(SeatState? state) {

@@ -97,6 +97,11 @@ void main() {
     await tapKey(tester, const ValueKey('guess-2'));
     expect(connection.calls, contains('judge:2:true'));
 
+    // Each guess is a switch while the host marks.
+    expect(find.byKey(const ValueKey('mark-1')), findsOneWidget);
+    await tapKey(tester, const ValueKey('mark-1'));
+    expect(connection.calls, contains('judge:1:true'));
+
     await tapKey(tester, const Key('confirmMarksButton'));
     await tapKey(tester, const Key('nextButton'));
     expect(connection.calls, containsAllInOrder(['judge_submit', 'next']));
@@ -106,6 +111,7 @@ void main() {
     await show(tester, 'reveal_judged_player');
     expect(find.byKey(const Key('confirmMarksButton')), findsNothing);
     expect(find.byKey(const Key('nextButton')), findsNothing);
+    expect(find.byType(Switch), findsNothing);
   });
 
   testWidgets('the final round: vote, then wager', (tester) async {

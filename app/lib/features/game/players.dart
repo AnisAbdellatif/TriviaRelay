@@ -16,6 +16,7 @@ class PlayerRow extends StatelessWidget {
     this.note,
     this.trailing,
     this.onTap,
+    this.highlight,
   });
 
   final PlayerView player;
@@ -23,6 +24,10 @@ class PlayerRow extends StatelessWidget {
   final String? note;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// A faint wash behind the row, a little wider than it (a guess the host
+  /// re-marked).
+  final Color? highlight;
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +38,7 @@ class PlayerRow extends StatelessWidget {
       if (!player.connected) 'away',
       ?note,
     ];
-    return InkWell(
+    final row = InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Padding(
@@ -70,6 +75,26 @@ class PlayerRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+    final highlight = this.highlight;
+    if (highlight == null) return row;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned(
+          left: -8,
+          right: -8,
+          top: 0,
+          bottom: 0,
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: highlight,
+              borderRadius: BorderRadius.circular(14),
+            ),
+          ),
+        ),
+        row,
+      ],
     );
   }
 }

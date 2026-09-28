@@ -22,6 +22,9 @@ class RevealView extends ConsumerWidget {
   bool _correct(RevealAnswer answer) =>
       state.you.judgements['${answer.peerId}'] ?? answer.correct;
 
+  /// The host marked it otherwise than Sporcle's exact match did.
+  bool _remarked(RevealAnswer answer) => _correct(answer) != answer.correct;
+
   String get _nextLabel {
     if (_final) return 'Show the final scores';
     final index = state.question?.index ?? 0;
@@ -77,29 +80,33 @@ class RevealView extends ConsumerWidget {
               child: Text(
                 state.question!.text,
                 style: fz.h(
-                  state.question!.text.characters.length <= 3 ? 44 : 18,
+                  state.question!.text.characters.length <= 3 ? 44 : 17,
+                  weight: FontWeight.w700,
                   color: FzColors.dim,
+                  height: 1.35,
                 ),
               ),
             ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           const FzEyebrow('The answer'),
           const SizedBox(height: 6),
           FzPanel(
+            color: FzColors.ac.withValues(alpha: .08),
             borderColor: FzColors.ac,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: FzDirection(
               text: reveal?.answer ?? '',
               child: Text(
                 reveal?.answer ?? '…',
                 key: const Key('correctAnswer'),
-                style: fz.h(26, color: FzColors.ac),
+                style: fz.h(28, color: FzColors.ac),
               ),
             ),
           ),
           const SizedBox(height: 20),
           FzEyebrow(
             host && !judged
-                ? 'Tap a guess to mark it'
+                ? 'Switch on the right guesses'
                 : judged
                 ? 'Marked'
                 : 'The host is marking the guesses',
@@ -111,9 +118,15 @@ class RevealView extends ConsumerWidget {
                 key: ValueKey('guess-${answer.peerId}'),
                 player: player,
                 you: player.peerId == state.you.peerId,
-                note:
-                    '"${(answer.text ?? '').isEmpty ? '—' : answer.text}" · '
-                    'wager ${answer.wager}',
+                note: [
+                  '"${(answer.text ?? '').isEmpty ? '—' : answer.text}"',
+                  'wager ${answer.wager}',
+                  if (_remarked(answer)) 'marked by host',
+                ].join(' · '),
+                highlight: _remarked(answer)
+                    ? (_correct(answer) ? FzColors.ok : FzColors.ac2)
+                          .withValues(alpha: .08)
+                    : null,
                 onTap: host && !judged
                     ? () => act(
                         context,
@@ -121,10 +134,28 @@ class RevealView extends ConsumerWidget {
                         (c) => c.judge(answer.peerId, !_correct(answer)),
                       )
                     : null,
-                trailing: Icon(
-                  _correct(answer) ? Icons.check_circle : Icons.cancel,
-                  color: _correct(answer) ? FzColors.ok : FzColors.ac2,
-                ),
+                // While the host marks, each guess is a switch: on is right.
+                // Once marked, or for everybody else, the verdict.
+                trailing: host && !judged
+                    ? Switch(
+                        key: ValueKey('mark-${answer.peerId}'),
+                        value: _correct(answer),
+                        activeTrackColor: FzColors.ok,
+                        trackOutlineColor: WidgetStateProperty.resolveWith(
+                          (states) => states.contains(WidgetState.selected)
+                              ? FzColors.ok
+                              : FzColors.line,
+                        ),
+                        onChanged: (right) => act(
+                          context,
+                          ref,
+                          (c) => c.judge(answer.peerId, right),
+                        ),
+                      )
+                    : Icon(
+                        _correct(answer) ? Icons.check_circle : Icons.cancel,
+                        color: _correct(answer) ? FzColors.ok : FzColors.ac2,
+                      ),
               ),
           const SizedBox(height: 22),
           const FzEyebrow('Standings'),

@@ -43,9 +43,15 @@ class ClosedView extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const SizedBox(height: 40),
-          Text(title, key: const Key('closedTitle'), style: fz.t(32)),
-          const SizedBox(height: 12),
-          Text(text, style: fz.m(15, color: FzColors.dim, height: 1.5)),
+          // The mark with its legs apart: nobody is holding this seat now.
+          Transform.translate(
+            offset: const Offset(-24, 0),
+            child: const FzMark(size: 150, faded: true),
+          ),
+          const SizedBox(height: 18),
+          Text(title, key: const Key('closedTitle'), style: fz.t(36)),
+          const SizedBox(height: 14),
+          Text(text, style: fz.m(15, color: FzColors.dim, height: 1.55)),
         ],
       ),
     );

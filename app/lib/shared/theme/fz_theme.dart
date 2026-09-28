@@ -1,60 +1,66 @@
 import 'package:flutter/material.dart';
 
-/// Colour tokens from `design/FazouraParty v2.dc.html`.
+/// Colour tokens from the Trivia Relay design canvas
+/// (https://claude.ai/artifact/Paezq4BHSeaUd4XLqfiZTt, "Identity").
+///
+/// Signal is the first leg of the relay: primary actions, the game code, the
+/// leader. Flare is the second: host actions, the held seat, the final round.
+/// Red is reserved for a clock running out.
 abstract final class FzColors {
-  /// Amber, primary.
-  static const ac = Color(0xFFFFB000);
+  /// Signal yellow, primary.
+  static const ac = Color(0xFFFFD23F);
 
-  /// Pink, secondary and alerts.
-  static const ac2 = Color(0xFFFF2D6F);
-  static const ink = Color(0xFFFBF6EC);
+  /// Flare pink, secondary and "wrong".
+  static const ac2 = Color(0xFFFF4F7B);
+  static const ink = Color(0xFFF1F0EA);
 
-  /// Secondary text. 65% ink: at least 4.5:1 on every ground the app draws,
-  /// including a panel under the lift at the top of the screen, which is the
-  /// worst of them. The design's 52% measured 3.7:1 there.
-  static const dim = Color(0xA6FBF6EC);
+  /// Secondary text. 66% ink: at least 4.5:1 on every ground the app draws.
+  static const dim = Color(0xA8F1F0EA);
 
-  /// Placeholders, disabled labels and other text nobody has to read to play.
-  /// 45% ink keeps it clearly below [dim] and still 3:1 on every ground; the
-  /// design's 30% was 2.5:1, which on a phone in a lit room is not there.
-  static const faint = Color(0x73FBF6EC);
+  /// Placeholders, fine print, disabled labels: text nobody has to read to
+  /// play. 50% ink, still 3:1 on the page.
+  static const faint = Color(0x80F1F0EA);
 
-  /// Deep teal: the card ground, and the text colour on amber or pink.
-  static const bg = Color(0xFF0A2422);
+  /// Navy: the card ground.
+  static const bg = Color(0xFF111729);
 
-  /// Darkest teal, behind everything.
-  static const bgDeep = Color(0xFF061917);
+  /// Darkest navy, behind everything, and the text colour on Signal or Flare.
+  static const bgDeep = Color(0xFF0A0E1A);
 
-  /// The lift at the top of the radial background.
-  static const bgGlow = Color(0xFF14403A);
-  static const panel = Color(0x0FFBF6EC);
+  /// Raised navy: placeholders for pictures that haven't come.
+  static const bgGlow = Color(0xFF1B2442);
+  static const panel = Color(0x0FF1F0EA);
 
   /// The mat behind a question's photo. Near-opaque warm white rather than the
   /// translucent [panel]: photos are letterboxed to fit (`BoxFit.contain`), and
   /// over the dark page that made a diagram, a product shot or anything else
   /// on a white ground read as a hole with the subject floating in it. A light
   /// mat gives it an edge, the way a print has one.
-  static const photoMat = Color(0xF7FBF6EC);
+  static const photoMat = Color(0xF7F1F0EA);
 
-  /// Hairline borders: fields, outlined buttons, cards. Heavier than the
-  /// design's 14% so a field or an outlined button still reads as one.
-  static const line = Color(0x33FBF6EC);
-  static const ok = Color(0xFF4FD39A);
+  /// Hairline borders: fields, outlined buttons, chips.
+  static const line = Color(0x33F1F0EA);
 
-  /// Red, for a clock that is running out and nothing else. Not in the design's
-  /// palette: its pink already means "wrong", and time running out needed to
-  /// read as a different, louder thing than a wrong answer does.
+  /// The empty part of a progress bar.
+  static const track = Color(0x1AF1F0EA);
+  static const ok = Color(0xFF3EE0A1);
+
+  /// Red, for a clock that is running out and nothing else: Flare already
+  /// means "wrong", and time running out has to read as a louder thing.
   static const alarm = Color(0xFFFF3B30);
 
-  /// The amber hairlines woven across every screen.
-  static const lattice = Color(0x0EFFB000);
+  /// The Signal rings in the top corner of every screen.
+  static const arcs = Color(0x12FFD23F);
+
+  /// The rings of the final round.
+  static const flareArcs = Color(0x17FF4F7B);
 }
 
 typedef FontApplier = TextStyle Function(TextStyle style);
 
-/// Fonts for the design: Figtree for body and buttons, DM Mono for labels,
-/// codes and numbers, Reem Kufi for display headings, and Noto Naskh Arabic
-/// behind all three for anything written in Arabic.
+/// Fonts for the design: Figtree for questions, body and buttons, DM Mono for
+/// labels, codes and numbers, Bricolage Grotesque for screen titles, and Noto
+/// Naskh Arabic behind all three for anything written in Arabic.
 ///
 /// All three are bundled with the app (pubspec `fonts:`) and referenced by
 /// family name, so nothing is ever fetched over the network — the design holds
@@ -73,8 +79,7 @@ class FzTheme extends ThemeExtension<FzTheme> {
 
   /// The Latin fonts carry no Arabic, so everything written in it — a quiz, a
   /// name, an answer — is drawn by the fallback. Naskh is the shape Arabic is
-  /// read in, and the one to hand a question to; Reem Kufi, which used to sit
-  /// here, is a display face and made body text hard going.
+  /// read in, and the one to hand a question to.
   ///
   /// Bundled rather than left to the system, because without a fallback that
   /// covers Arabic, Flutter Web fetches one from fonts.gstatic.com on first
@@ -91,8 +96,17 @@ class FzTheme extends ThemeExtension<FzTheme> {
     fontFamilyFallback: const [..._arabicFallback, 'monospace'],
   );
 
-  static TextStyle _reemKufi(TextStyle style) =>
-      style.copyWith(fontFamily: 'Reem Kufi');
+  /// Bricolage Grotesque is one variable file. Its axes are set explicitly,
+  /// weight and optical size (which the browser would match to the font size),
+  /// so every platform draws the same heavy, tight title.
+  static TextStyle _bricolage(TextStyle style) => style.copyWith(
+    fontFamily: 'Bricolage Grotesque',
+    fontFamilyFallback: _arabicFallback,
+    fontVariations: [
+      FontVariation.weight((style.fontWeight ?? FontWeight.w800).value * 1.0),
+      FontVariation.opticalSize((style.fontSize ?? 14).clamp(12, 96) * 1.0),
+    ],
+  );
 
   /// The design's fonts, by the family names the bundled files declare.
   /// Named `fallback` because it is also what a widget test gets when no theme
@@ -101,7 +115,7 @@ class FzTheme extends ThemeExtension<FzTheme> {
   static const fallback = FzTheme(
     displayFont: _figtree,
     monoFont: _dmMono,
-    titleFont: _reemKufi,
+    titleFont: _bricolage,
   );
 
   static FzTheme of(BuildContext context) =>
@@ -141,15 +155,14 @@ class FzTheme extends ThemeExtension<FzTheme> {
     ),
   );
 
-  /// Reem Kufi, the design's screen titles: airy word spacing, slightly tight
-  /// letters ("Pick tonight's quiz", "Standings", the فزورة wordmark).
+  /// Bricolage Grotesque ExtraBold, the design's screen titles: tight
+  /// letters, tight lines ("Pick a pack", "Your wager", "Trivia Relay").
   TextStyle t(
     double size, {
-    FontWeight weight = FontWeight.w700,
+    FontWeight weight = FontWeight.w800,
     Color color = FzColors.ink,
-    double height = 1.16,
-    double tracking = -.01,
-    double spacing = .14,
+    double height = 1.05,
+    double tracking = -.025,
   }) => titleFont(
     TextStyle(
       fontSize: size,
@@ -157,7 +170,6 @@ class FzTheme extends ThemeExtension<FzTheme> {
       color: color,
       height: height,
       letterSpacing: size * tracking,
-      wordSpacing: size * spacing,
     ),
   );
 
@@ -176,15 +188,19 @@ class FzTheme extends ThemeExtension<FzTheme> {
   FzTheme lerp(FzTheme? other, double t) => this;
 }
 
+/// A field's outline. Fields are hairline until focused; the one field a
+/// screen is for (the game code, the answer) is Signal from the start.
+OutlineInputBorder fzFieldBorder(Color color) => OutlineInputBorder(
+  borderRadius: BorderRadius.circular(14),
+  borderSide: BorderSide(color: color, width: 1.5),
+);
+
 /// The app's single dark theme.
 ThemeData buildFzTheme({
   FzTheme fz = FzTheme.fallback,
   TextTheme Function(TextTheme base)? applyTextFont,
 }) {
-  OutlineInputBorder border(Color color) => OutlineInputBorder(
-    borderRadius: BorderRadius.circular(14),
-    borderSide: BorderSide(color: color, width: 1.5),
-  );
+  const border = fzFieldBorder;
   bool selected(Set<WidgetState> states) =>
       states.contains(WidgetState.selected);
 
@@ -197,13 +213,13 @@ ThemeData buildFzTheme({
     useMaterial3: true,
     colorScheme: const ColorScheme.dark(
       primary: FzColors.ac,
-      onPrimary: FzColors.bg,
+      onPrimary: FzColors.bgDeep,
       secondary: FzColors.ac2,
-      onSecondary: FzColors.bg,
+      onSecondary: FzColors.bgDeep,
       tertiary: FzColors.ok,
-      onTertiary: FzColors.bg,
+      onTertiary: FzColors.bgDeep,
       error: FzColors.ac2,
-      onError: FzColors.bg,
+      onError: FzColors.bgDeep,
       surface: FzColors.bg,
       onSurface: FzColors.ink,
       onSurfaceVariant: FzColors.dim,
@@ -231,19 +247,19 @@ ThemeData buildFzTheme({
     sliderTheme: SliderThemeData(
       trackHeight: 6,
       activeTrackColor: FzColors.ac,
-      inactiveTrackColor: const Color(0x1AFBF6EC),
+      inactiveTrackColor: FzColors.track,
       thumbColor: FzColors.ac,
       overlayColor: FzColors.ac.withValues(alpha: .16),
-      activeTickMarkColor: FzColors.bg.withValues(alpha: .35),
+      activeTickMarkColor: FzColors.bgDeep.withValues(alpha: .35),
       inactiveTickMarkColor: FzColors.line,
       disabledActiveTrackColor: FzColors.faint,
       disabledThumbColor: FzColors.faint,
       valueIndicatorColor: FzColors.ac,
-      valueIndicatorTextStyle: fz.m(14, color: FzColors.bg),
+      valueIndicatorTextStyle: fz.m(14, color: FzColors.bgDeep),
     ),
     switchTheme: SwitchThemeData(
       thumbColor: WidgetStateProperty.resolveWith(
-        (states) => selected(states) ? FzColors.bg : FzColors.dim,
+        (states) => selected(states) ? FzColors.bgDeep : FzColors.dim,
       ),
       trackColor: WidgetStateProperty.resolveWith(
         (states) => selected(states) ? FzColors.ac : FzColors.panel,
@@ -256,13 +272,33 @@ ThemeData buildFzTheme({
     // Material's, and never wider than the phone column it opens over — on a
     // desktop the default stretched a short form across the whole window.
     dialogTheme: DialogThemeData(
-      backgroundColor: const Color(0xFF0C2B28),
+      backgroundColor: FzColors.bg,
       surfaceTintColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 480),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       titleTextStyle: fz.t(24),
       contentTextStyle: fz.m(13, color: FzColors.dim, height: 1.5),
+    ),
+    // Every choice in the app (wagers, options, pack lists) is a ChoiceChip:
+    // a hairline box that turns Signal when chosen. Each call site sets only
+    // its label.
+    chipTheme: ChipThemeData(
+      showCheckmark: false,
+      color: WidgetStateProperty.resolveWith(
+        (states) => selected(states)
+            ? FzColors.ac.withValues(alpha: .24)
+            : Colors.transparent,
+      ),
+      side: WidgetStateBorderSide.resolveWith(
+        (states) => BorderSide(
+          color: selected(states) ? FzColors.ac : FzColors.line,
+          width: 1.5,
+        ),
+      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
+      labelStyle: fz.m(14),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
@@ -273,7 +309,7 @@ ThemeData buildFzTheme({
       ),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: const Color(0xFF103330),
+      backgroundColor: FzColors.bgGlow,
       contentTextStyle: fz.m(13),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -282,7 +318,7 @@ ThemeData buildFzTheme({
       color: FzColors.ac,
     ),
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: Color(0xFF0C2B28),
+      backgroundColor: FzColors.bg,
       showDragHandle: true,
       dragHandleColor: FzColors.line,
       shape: RoundedRectangleBorder(
@@ -291,7 +327,7 @@ ThemeData buildFzTheme({
     ),
     textSelectionTheme: const TextSelectionThemeData(
       cursorColor: FzColors.ac,
-      selectionColor: Color(0x55FFB000),
+      selectionColor: Color(0x55FFD23F),
       selectionHandleColor: FzColors.ac,
     ),
   );

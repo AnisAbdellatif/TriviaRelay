@@ -30,21 +30,23 @@ class UpdateBanner extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: FzPanel(
-        borderColor: FzColors.ac,
-        padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+        color: Colors.transparent,
+        borderColor: FzColors.ac.withValues(alpha: .4),
+        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
         child: Row(
           children: [
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FzEyebrow('New version', color: FzColors.ac),
-                  const SizedBox(height: 4),
+                  FzEyebrow(
+                    size == null ? 'New version' : 'New version · $size',
+                    color: FzColors.ac,
+                  ),
+                  const SizedBox(height: 3),
                   Text(
-                    size == null
-                        ? release.version
-                        : '${release.version} · $size',
-                    style: fz.m(12.5, color: FzColors.dim),
+                    'Trivia Relay ${release.version} is out.',
+                    style: fz.h(14, weight: FontWeight.w500),
                   ),
                 ],
               ),
@@ -53,8 +55,9 @@ class UpdateBanner extends ConsumerWidget {
               key: const Key('updateDownloadButton'),
               label: 'Get it',
               expand: false,
-              height: 40,
-              fontSize: 13,
+              height: 44,
+              fontSize: 15,
+              radius: 12,
               onPressed: () => _download(context, ref),
             ),
             IconButton(
