@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:trivia_relay/core/connection/phoenix_seat_connection.dart';
+import 'package:trivia_relay/core/connection/seat_connection.dart';
 import 'package:trivia_relay/core/models/models.dart';
 
 import '../support/protocol_fixtures.dart';
@@ -33,6 +34,41 @@ void main() {
       PackList.values.map((l) => l.name).toList(),
       constants['pack_lists'],
     );
+  });
+
+  test('the joinable game lists are the relay\'s', () {
+    expect(
+      GameList.values.map((l) => l.name).toList(),
+      constants['game_lists'],
+    );
+  });
+
+  test('a seat closed by the host says whether it may come back', () {
+    SeatClosedReason closed(Map<String, dynamic> payload) =>
+        PhoenixSeatConnection.reasonFrom(payload);
+    expect(
+      closed({'reason': 'removed', 'can_rejoin': true}),
+      SeatClosedReason.removed,
+    );
+    expect(
+      closed({'reason': 'removed', 'can_rejoin': false}),
+      SeatClosedReason.kicked,
+    );
+    expect(
+      closed({'reason': 'removed'}),
+      SeatClosedReason.removed,
+      reason: 'a 1.1 relay never said',
+    );
+    expect(
+      closed({'reason': 'left', 'replaced': true}),
+      SeatClosedReason.moved,
+    );
+    expect(
+      closed({'reason': 'left', 'replaced': false}),
+      SeatClosedReason.left,
+    );
+    expect(closed({'reason': 'left'}), SeatClosedReason.left);
+    expect(closed({'reason': 'someday'}), SeatClosedReason.shutdown);
   });
 
   test('the final vote offers what the relay takes', () {

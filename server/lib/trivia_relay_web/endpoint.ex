@@ -4,7 +4,13 @@ defmodule TriviaRelayWeb.Endpoint do
   # Phones reach their seats here (protocol/PROTOCOL.md §2). Snapshots are compressed
   # (permessage-deflate) for every client that offers it; each compressed socket keeps
   # its own deflate state, kept small with mem_level 4 (config.exs), as FazouraParty
-  # measured. Intents are small, so frames are capped small.
+  # measured.
+  #
+  # Intents are small (an answer is at most 200 characters), and anybody may send a
+  # socket anything before joining a seat, so a message is capped small however it
+  # arrives: one frame here, fragments together in config.exs
+  # (`max_fragmented_message_size`, which Phoenix doesn't pass on; Bandit's default is
+  # 8 MB). A compressed one may inflate only so far (`max_inflate_ratio`, config.exs).
   socket "/socket", TriviaRelayWeb.UserSocket,
     websocket: [
       connect_info: [:peer_data, :x_headers],

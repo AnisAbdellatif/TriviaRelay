@@ -23,13 +23,16 @@ defmodule TriviaRelay.SnapshotFixturesTest do
       "reveal_judged_player" => Replay.first(&(&1.phase == :reveal and &1.judged), :join),
       "final_vote_player" => Replay.fresh(:final_vote, :join),
       "final_wager_host" => Replay.fresh(:final_wager),
+      # Both have wagered: the player sees their own amount, and only that the host wagered.
+      "final_wager_player" =>
+        Replay.first(&(&1.phase == :final_wager and map_size(&1.final.wagers) == 2), :join),
       "final_question_player" => Replay.fresh(:final_question, :join),
       "final_scores_host" => Replay.fresh(:final_scores)
     }
   end
 
   for name <- ~w(lobby_host question_player question_host_answered reveal_host
-                 reveal_judged_player final_vote_player final_wager_host
+                 reveal_judged_player final_vote_player final_wager_host final_wager_player
                  final_question_player final_scores_host) do
     test "#{name} is what the relay sends" do
       name = unquote(name)

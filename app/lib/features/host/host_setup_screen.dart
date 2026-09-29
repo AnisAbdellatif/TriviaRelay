@@ -72,7 +72,12 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
               ? 'Choose a pack'
               : 'Create the game',
           trailing: _pack == null ? null : _summary(_options),
-          onPressed: _pack != null && !_creating ? _create : null,
+          busy: _creating,
+          onPressed: _creating
+              ? null
+              : _pack == null
+              ? _choosePack
+              : _create,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -161,12 +166,11 @@ class _PackChoice extends StatelessWidget {
         trailing: Text('Change', style: fz.m(13, color: FzColors.ac)),
       );
     }
-    return InkWell(
+    return FzTile(
       key: const Key('choosePackButton'),
-      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: FzPanel(
-        borderColor: FzColors.line,
+        borderColor: FzColors.edge,
         padding: const EdgeInsets.all(10),
         child: Row(
           children: [

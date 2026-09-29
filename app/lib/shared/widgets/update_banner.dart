@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/providers/update_providers.dart';
 import '../theme/fz_theme.dart';
 import 'fz.dart';
+import 'fz_toast.dart';
 
 /// Offers the newer APK on the home screen, once, until it is waved away.
 ///
@@ -26,14 +27,16 @@ class UpdateBanner extends ConsumerWidget {
 
     final size = release.sizeLabel;
 
-    // Sits above the home screen's buttons, spaced like one of them.
+    // At the top of the home screen, above its title. The button sits under
+    // the words, so large text or a narrow phone never squeezes either.
     return Padding(
-      padding: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.only(bottom: 18),
       child: FzPanel(
         color: Colors.transparent,
         borderColor: FzColors.ac.withValues(alpha: .4),
-        padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
+        padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(
               child: Column(
@@ -48,17 +51,18 @@ class UpdateBanner extends ConsumerWidget {
                     'Trivia Relay ${release.version} is out.',
                     style: fz.h(14, weight: FontWeight.w500),
                   ),
+                  const SizedBox(height: 10),
+                  FzButton(
+                    key: const Key('updateDownloadButton'),
+                    label: 'Get it',
+                    expand: false,
+                    height: 44,
+                    fontSize: 15,
+                    radius: 12,
+                    onPressed: () => _download(context, ref),
+                  ),
                 ],
               ),
-            ),
-            FzButton(
-              key: const Key('updateDownloadButton'),
-              label: 'Get it',
-              expand: false,
-              height: 44,
-              fontSize: 15,
-              radius: 12,
-              onPressed: () => _download(context, ref),
             ),
             IconButton(
               key: const Key('updateDismissButton'),
@@ -75,12 +79,9 @@ class UpdateBanner extends ConsumerWidget {
   }
 
   Future<void> _download(BuildContext context, WidgetRef ref) async {
-    final messenger = ScaffoldMessenger.of(context);
     final opened = await ref.read(availableUpdateProvider.notifier).download();
-    if (!opened) {
-      messenger.showSnackBar(
-        const SnackBar(content: Text('Could not open the download.')),
-      );
+    if (!opened && context.mounted) {
+      showFzToast(context, 'Could not open the download.');
     }
   }
 }

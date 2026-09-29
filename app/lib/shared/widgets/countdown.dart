@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -13,22 +14,34 @@ import 'fz_motion.dart';
 /// clock offset, or the frozen [pausedRemainingMs]. With [timeLimitMs] it
 /// draws the design's progress bar next to the seconds.
 ///
-/// The last [warningSeconds] turn red; the last [finalSeconds] get louder
-/// still. Paused, it is dim and still.
+/// The last [warningSecondsFor] seconds turn red; the last [finalSeconds]
+/// get louder still. At zero it says so, and calls [onExpired] once. Paused,
+/// it is dim and still.
 class Countdown extends ConsumerStatefulWidget {
   const Countdown({
     super.key,
     required this.deadline,
     required this.pausedRemainingMs,
     this.timeLimitMs,
+    this.onExpired,
   });
 
   final int? deadline;
   final int? pausedRemainingMs;
   final int? timeLimitMs;
 
+  /// Called once when the time runs out, after the frame that shows it.
+  final VoidCallback? onExpired;
+
   static const warningSeconds = 10;
   static const finalSeconds = 3;
+
+  /// How many seconds at the end turn red: ten, or a third of a shorter clock,
+  /// so a 15 s question isn't red for two thirds of it.
+  static int warningSecondsFor(int? timeLimitMs) {
+    if (timeLimitMs == null || timeLimitMs <= 0) return warningSeconds;
+    return math.min(warningSeconds, (timeLimitMs / 1000 / 3).floor());
+  }
 
   @override
   ConsumerState<Countdown> createState() => _CountdownState();
@@ -38,6 +51,9 @@ class _CountdownState extends ConsumerState<Countdown> {
   static const _settle = Duration(milliseconds: 300);
 
   Timer? _ticker;
+
+  /// The deadline [Countdown.onExpired] was last called for.
+  int? _expiredFor;
 
   @override
   void initState() {
@@ -85,12 +101,20 @@ class _CountdownState extends ConsumerState<Countdown> {
 
     final fz = FzTheme.of(context);
     final seconds = (ms / 1000).ceil();
+    final over = !paused && ms <= 0;
+    if (over && _expiredFor != deadline && widget.onExpired != null) {
+      _expiredFor = deadline;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) widget.onExpired?.call();
+      });
+    }
     // The last ten seconds warm to red and each one lands with a kick; the
     // last three are the loud part — a bigger number, a harder kick and a
     // heartbeat on the bar. Triggers are null the rest of the time, which is
     // what keeps the clock still until it matters.
-    final warning = !paused && seconds <= Countdown.warningSeconds;
-    final finale = !paused && seconds <= Countdown.finalSeconds;
+    final warning =
+        !paused && seconds <= Countdown.warningSecondsFor(widget.timeLimitMs);
+    final finale = !paused && !over && seconds <= Countdown.finalSeconds;
     final quick = reduceMotion(context) ? Duration.zero : _settle;
     final target = paused
         ? FzColors.dim
@@ -116,8 +140,15 @@ class _CountdownState extends ConsumerState<Countdown> {
               scale: finale ? 1.4 : 1.25,
               duration: Duration(milliseconds: finale ? 340 : 260),
               child: Text(
-                paused ? 'PAUSED · ${seconds}s' : '$seconds',
+                paused
+                    ? 'PAUSED · ${seconds}s'
+                    : over
+                    ? "Time's up"
+                    : '$seconds',
                 key: const Key('countdown'),
+                semanticsLabel: paused || over
+                    ? null
+                    : '$seconds second${seconds == 1 ? '' : 's'} left',
                 style: fz
                     .m(15, color: color)
                     .copyWith(

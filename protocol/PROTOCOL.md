@@ -28,11 +28,18 @@ same `major.minor`.
 
 Errors are `{"code": "...", "message": "..."}`. The app branches on the code; the message
 is for a person. Every endpoint below is rate-limited per address, and answers
-`429 rate_limited` with `retry-after` when over.
+`429 rate_limited` with `retry-after` when over. Since 1.2, an IPv6 address is limited per
+/64 and again (with more room) per /48.
+
+Every endpoint that asks Sporcle something may also answer `503 relay_busy` with
+`retry-after`: the relay is already waiting on as many Sporcle calls as it allows, and
+refuses at once rather than queueing. (Since 1.2.)
 
 Sporcle credentials ("the player") are `{player_id, token, device_id, handle}`:
 - `player_id` and `token` are the Party credentials a login returns.
-- `device_id` is a random 16-hex id the app makes once per install.
+- `device_id` is a random 16-hex id the app makes once per install: 16 lowercase hex digits,
+  anything else is refused (`400 invalid_player`, or `invalid_request` for a login; since
+  1.2).
 - `handle` is the name other players see.
 
 The relay uses them for the one Sporcle call a request makes and keeps none of them.
@@ -43,8 +50,15 @@ The relay uses them for the one Sporcle call a request makes and keeps none of t
 browser may not call sporcle.com itself; the Android app runs the same chain on the phone.
 The password goes to Sporcle and nowhere else, and is never logged.
 
+The request must come from the relay's own web app: its `Origin` is the relay's (since 1.2).
+
 Errors:
+- `400 invalid_request`: no email or password, or a `device_id` that isn't 16 hex digits.
 - `401 login_failed`: the email and password don't match an account.
+- `403 forbidden_origin`: the request didn't come from the relay's own web app.
+- `429 rate_limited`: besides the per-address limit, failed logins are limited per email, and
+  across the relay: after too many failures in a minute from anywhere, every login is
+  refused until the minute ends. (Since 1.2.)
 - `502 sporcle_unavailable`: Sporcle didn't answer.
 
 ### 3.2 `GET /api/packs?q=<text>&list=<list>&page=<n>`
@@ -86,12 +100,46 @@ Errors:
 - `401 sporcle_auth`: the Sporcle sign-in has expired; log in again.
 - `409 game_refused`: Sporcle answered without a place in the game, and `message` is what it
   said.
+- `429 rate_limited`: besides the per-address limits, each Sporcle account may create and
+  join only so many games in a while, and joins Sporcle refuses (a wrong code) are limited
+  more tightly, per account and per address. (Since 1.2.)
 - `502 sporcle_unavailable`.
+- `503 seats_full`: the relay holds as many seats as it can; try again later. Checked before
+  Sporcle is asked, so the player has not been seated. (Since 1.2.)
 
 A seat with no app connected is held for a time the deployment sets (`SEAT_HOLD_SECONDS`,
 default 300). While it is held, the player stays in the game as far as Sporcle and everyone
 else can tell, and when a question's time runs out the relay answers for them the way the
 official app does (§6.3). Then the seat leaves the game.
+
+Limits on a seat (since 1.2):
+- An app joins its new seat (§4.1) right away: until one has, the seat is held for only a
+  short time the deployment sets (30 s by default), never longer than the hold.
+- A seat lives at most a day, as its token does, app or no app (`seat_closed` `expired`).
+- A player has one seat at a time. A new seat for the same Sporcle account ends the one
+  they had (`seat_closed` `left` with `replaced`, §5.2); in the same game, the new seat
+  keeps what the old one spent: the questions answered, the wagers used, the final vote and
+  wager.
+- A few apps may be joined to a seat at once (3 by default). One more joining closes the channel of the
+  one that joined first, with no `seat_closed` (it is not the seat that ended), so that app
+  stops rejoining.
+
+### 3.4 `GET /api/games`
+
+The games the player could join, as the official app's join screen lists them. The player
+goes in headers, as for §3.2. Joining one is `POST /api/seats` with its `code` (§3.3).
+
+Returns `200 {games: [{code, list, pack, host, player_count, stage, question_number,
+has_images}]}`:
+- `list` is one of `game_lists` in `constants.json`: `invited` (the player was invited),
+  `friends` (a friend's game) or `public` (a game hosted for `anyone`). Games come in that
+  order. Within each list, games still in their lobby come first, then the games with the
+  most players. A game in more than one list is listed once, in the first.
+- `pack` is `{id, name, description, image_url}`, or null.
+- `host` is the host's name. `player_count` counts everybody in the game.
+- `stage` is where the game is: `lobby`, `question` (`question_number` is the question it is
+  on, from 1), `final`, or `playing` when the relay can't tell. Joining after the lobby
+  seats the player mid-game. (Since 1.2.)
 
 ## 4. App → relay
 
@@ -105,6 +153,10 @@ Failures:
 - `rate_limited`: failed joins are limited to 30 a minute per address; joins that work are
   never counted.
 
+The WebSocket itself may be refused (`403` on the upgrade) when an address opens too many,
+or holds too many open at once, and a message larger than 16 KB, sent whole or in fragments,
+closes it (`1009`). (Since 1.2.)
+
 ### 4.2 Intents
 
 Pushed on the seat channel; each replies `ok` or an error `{code, message}`. They are
@@ -112,7 +164,7 @@ checked against the seat's state, so an app may send any of them at any time:
 
 | event | payload | when |
 |---|---|---|
-| `ready` | `{ready: bool}` | any time the game is live |
+| `ready` | `{ready: bool}` | any time the game is live; one that changes nothing is `ok` and not passed on |
 | `draft` | `{text, wager}` | while typing; what the relay answers with if time runs out |
 | `answer` | `{text, wager}` | `question`: `wager` must be in `you.wager_choices`. `final_question`: the final wager is used, whatever is sent |
 | `final_vote` | `{choice}`, one of `final_votes` (`easy`, `medium`, `hard`) | `final_vote`, once |
@@ -127,7 +179,7 @@ Host only (`you.host`); anybody else gets `not_host`:
 | `start` | `{}` | `lobby` |
 | `options` | `{questions_per_game, question_seconds, audience}` | `lobby` |
 | `reveal` | `{}` | `question`, `final_question`, once `you.can_reveal` |
-| `judge` | `{peer_id, correct: bool}` | `reveal`, `final_reveal`: mark one player |
+| `judge` | `{peer_id, correct: bool}` | `reveal`, `final_reveal`: mark one of `players` (anybody else is `invalid_intent`) |
 | `judge_submit` | `{}` | `reveal`, `final_reveal`: settle the marks and the scores |
 | `next` | `{}` | `reveal`: next question (after the last one, into the final). `final_vote`: move on before everyone voted. `final_wager`: ask the final question. `final_reveal`: show the final scores |
 
@@ -137,7 +189,8 @@ Other error codes:
 - `already_answered`, `already_voted`, `already_wagered`.
 - `not_everyone_answered`: a `reveal` before `you.can_reveal`.
 - `invalid_wager`, `invalid_options`, `invalid_intent`.
-- `rate_limited`: 60 intents per 10 s.
+- `rate_limited`: 60 intents per 10 s, per connection and again per seat (all its apps
+  together).
 
 ## 5. Relay → app
 
@@ -173,16 +226,21 @@ final:    {votes: {easy, medium, hard}, picked, vote, wager, wagers: [{peer_id, 
   `deadline`, as the official app allows.
 - `you.judgements` holds the host's marks so far (empty for anybody else). `you.judged` is
   set once they are submitted for this question.
+- `final.wager` is this seat's final wager, placed from the app or listed by Sporcle.
+  `final.wagers` is everybody's, except during `final_vote` and `final_wager`: then it holds
+  this seat's own at most, and `players[].final_wagered` says who else has wagered (§6.2).
+  (Since 1.2.)
 
 ### 5.2 `seat_closed`
 
-`{reason}`, after which the channel closes and the seat no longer exists:
+`{reason, can_rejoin, replaced}`, after which the channel closes and the seat no longer
+exists:
 
 | reason | meaning |
 |---|---|
-| `left` | the player left |
-| `expired` | no app came back within the hold |
-| `removed` | the host removed the player |
+| `left` | the player left. With `replaced: true`, the same player took another seat, on this app or another (since 1.2; an app that doesn't know it reads it as left) |
+| `expired` | no app came back within the hold, or the seat reached its maximum age (a day) |
+| `removed` | the host removed the player. `can_rejoin` is false when Sporcle won't let them back in: the host kicked them for good, or they were kicked before and this was them trying to join again. Only with `removed`; since 1.2, and an app treats it missing as true |
 | `shutdown` | the relay is restarting |
 
 ## 6. The game
@@ -210,6 +268,10 @@ correct answer until the host reveals. Until a player has answered, they see who
 and nothing of what. Once they have, `players[].guess` carries everybody's guess as it comes
 in, as the official app shows it on its waiting screen. Sporcle sends all of this on every
 submission; the relay withholds what the official app would not show. (Since 1.1.)
+
+Final wagers are the same: Sporcle lists every amount as it is placed, and until the final
+question is asked a seat sees only its own, so nobody wagers knowing the others'. (Since
+1.2.)
 
 ### 6.3 Wagers and scoring
 

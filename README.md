@@ -24,11 +24,13 @@ The look (palette, type, the mark, the app icon) comes from the
 ## Running it locally
 
 ```bash
-cd app && flutter build web
+cd app && flutter build web --no-web-resources-cdn
 cd ../server && mix deps.get && WEB_DIR=../app/build/web mix phx.server
 ```
 
-Then open http://localhost:4100. To work on the app with hot reload instead, run the relay
+Then open http://localhost:4100. (`--no-web-resources-cdn` puts CanvasKit in the build
+instead of loading it from gstatic.com, which the relay's Content-Security-Policy would
+refuse.) To work on the app with hot reload instead, run the relay
 as above and `flutter run -d chrome` in `app/`: a debug build talks to `localhost:4100`.
 
 Configuration (environment):
@@ -48,7 +50,7 @@ Everything CI runs is in [`scripts/ci.sh`](scripts/ci.sh), and runs the same way
 ```bash
 scripts/ci.sh            # server + app + image, what a pull request runs
 scripts/ci.sh server     # mix compile, format, credo, test
-scripts/ci.sh app        # dart format, flutter analyze, flutter test, flutter build web
+scripts/ci.sh app        # dart format, flutter analyze, flutter test, the web build
 scripts/ci.sh image      # the production Docker image (after `app`)
 ```
 
@@ -84,15 +86,24 @@ git tag -a v0.2.0 -m "What changed, in a line"
 git push origin v0.2.0
 ```
 
-That runs both suites, builds a signed universal APK, and publishes it as a GitHub release
-with a small `android.json` manifest. An installed app reads that manifest from
+That runs both suites, builds a universal APK unsigned, signs it in a separate job, and
+publishes it as a GitHub release with a small `android.json` manifest. An installed app reads that manifest from
 `releases/latest/download/android.json` at most once every six hours, and offers the
 download on the home screen and in Settings. Tapping it opens the APK in the browser;
 the app never installs anything itself. A tag with a suffix (`v1.0.0-rc.1`) is published
 as a pre-release, which `latest` skips.
 
 `scripts/ci.sh apk` refuses to build unless the tag matches `app/pubspec.yaml`, the build
-number is above the last release's, and the tagged commit is on `main`.
+number is above the last release's, the tagged commit is on `main`, and the relay's
+address is `https://`.
+
+The signing key never meets the build. `scripts/ci.sh apk` runs Flutter and Gradle, which
+download and run plugins this repository does not control, so it builds the APK
+**unsigned**, with no key anywhere it can read. `scripts/ci.sh sign` then aligns and signs
+it with the Android build-tools' `zipalign` and `apksigner` alone, checks the signature
+(`apksigner verify --print-certs`), writes `android.json` from the signed file, and
+deletes the keystore it unpacked. In CI the two are separate jobs on separate machines,
+and only the signing step is given the secrets.
 
 ### The signing key
 
@@ -116,16 +127,37 @@ same one. Then add it to the repository's **production** environment, as secrets
 The APK also needs to know which relay to talk to (Android has no origin to infer one
 from), so set the `PUBLIC_HOST` repository variable to the relay's domain.
 
-The release job runs in the `production` environment so the key is not a repository-wide
+The signing job runs in the `production` environment so the key is not a repository-wide
 secret. In *Settings → Environments → production*, allow `main` and the tag pattern `v*`
-and nothing else, and add a tag ruleset for `v*` that only maintainers can create.
+and nothing else, turn on **Required reviewers** (so a release waits for a person to
+approve it before the key is handed out), and add a tag ruleset for `v*` that only
+maintainers can create.
 
 To build one locally, put the same values in `app/android/key.properties` (`storeFile`,
-`storePassword`, `keyAlias`, `keyPassword`; git-ignored) and run:
+relative to `app/android/app`, `storePassword`, `keyAlias`, `keyPassword`; git-ignored), or
+set the `ANDROID_KEYSTORE_PATH`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS` and
+`ANDROID_KEY_PASSWORD` variables, and run:
 
 ```bash
-SERVER_URL=https://your.relay scripts/ci.sh apk
+SERVER_URL=https://your.relay scripts/ci.sh apk   # the build: never given the key
+scripts/ci.sh sign                                 # needs the Android SDK's build-tools
 ```
+
+The signed APK and `android.json` land in `app/build/release/`.
+
+Gradle checks every dependency it downloads against
+`app/android/gradle/verification-metadata.xml` (SHA-256), and the wrapper checks the Gradle
+download itself (`distributionSha256Sum`). Upgrading Flutter, the Android Gradle plugin,
+Kotlin or a plugin changes what Gradle fetches, and the build then stops at the first
+unlisted file. Regenerate the list from `app/android/`, after one `flutter build apk` so
+Flutter has set the project up, and review the diff:
+
+```bash
+./gradlew --write-verification-metadata sha256 assembleDebug assembleProfile assembleRelease
+```
+
+It lists the Linux build of `aapt2` only (CI and this list are made on Linux); building on
+macOS or Windows needs the same command run there once.
 
 Anything built another way (`flutter run`, a hand-run `flutter build apk`) is a development
 build: it installs as **Trivia Relay Dev** (`com.triviarelay.app.dev`), beside the release

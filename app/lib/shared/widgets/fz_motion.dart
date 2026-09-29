@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 
 /// Whether this device has asked for less motion.
@@ -9,76 +7,6 @@ import 'package:flutter/material.dart';
 /// to turn off: the setting is usually on because motion makes somebody ill.
 bool reduceMotion(BuildContext context) =>
     MediaQuery.maybeOf(context)?.disableAnimations ?? false;
-
-/// The design's `shake`: a short sideways wobble, run once whenever [trigger]
-/// changes to a new non-null value.
-///
-/// Used for an answer the host would not take — the field says no by moving,
-/// which is read before any error text is (design `@keyframes shake`).
-class FzShake extends StatefulWidget {
-  const FzShake({
-    super.key,
-    required this.child,
-    required this.trigger,
-    this.distance = 5,
-    this.duration = const Duration(milliseconds: 320),
-  });
-
-  final Widget child;
-
-  /// Shakes when this changes. Null never shakes, so a widget can start life
-  /// settled.
-  final Object? trigger;
-  final double distance;
-  final Duration duration;
-
-  @override
-  State<FzShake> createState() => _FzShakeState();
-}
-
-class _FzShakeState extends State<FzShake> with SingleTickerProviderStateMixin {
-  late final AnimationController _controller = AnimationController(
-    vsync: this,
-    duration: widget.duration,
-  );
-
-  @override
-  void didUpdateWidget(FzShake old) {
-    super.didUpdateWidget(old);
-    if (widget.trigger != null &&
-        widget.trigger != old.trigger &&
-        !reduceMotion(context)) {
-      _controller.forward(from: 0);
-    }
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      // Two full cycles that die away, rather than the design's single
-      // there-and-back: on a phone one pass reads as a layout glitch. The
-      // decay is what keeps it from ending anywhere but centred.
-      builder: (context, child) {
-        final t = _controller.value;
-        return Transform.translate(
-          offset: Offset(
-            widget.distance * (1 - t) * math.sin(t * math.pi * 4),
-            0,
-          ),
-          child: child,
-        );
-      },
-      child: widget.child,
-    );
-  }
-}
 
 /// A quick overshoot, run once whenever [trigger] changes.
 ///

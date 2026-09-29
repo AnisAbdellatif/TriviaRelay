@@ -27,6 +27,19 @@ String describeError(Object error) {
     'invalid_wager' => "That wager isn't available.",
     'invalid_options' => "Those game options aren't allowed.",
     'rate_limited' => 'Too many tries. Wait a moment and try again.',
+    'seats_full' => 'The relay is full right now. Try again in a few minutes.',
+    'relay_busy' =>
+      'The relay is busy waiting on Sporcle. Try again in a moment.',
+    'forbidden_origin' =>
+      "Signing in works only from Trivia Relay's own web page.",
+    'invalid_request' =>
+      "The relay couldn't read that sign-in. Check the email and password, "
+          'then try again.',
+    'not_everyone_answered' =>
+      'Not everyone has answered yet. Reveal opens 5 seconds after time '
+          'runs out.',
+    'invalid_intent' => "That can't be done right now.",
+    GameError.notJoined => 'Not connected to the game right now.',
     GameError.connectionFailed => 'Could not reach the relay.',
     GameError.timeout => 'The relay did not answer.',
     _ => error.message ?? 'Something went wrong (${error.code}).',

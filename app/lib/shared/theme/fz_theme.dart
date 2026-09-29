@@ -38,8 +38,17 @@ abstract final class FzColors {
   /// mat gives it an edge, the way a print has one.
   static const photoMat = Color(0xF7F1F0EA);
 
-  /// Hairline borders: fields, outlined buttons, chips.
+  /// Hairline borders that only decorate: dividers, panels, the drag handle.
   static const line = Color(0x33F1F0EA);
+
+  /// The outline that tells a control apart from the page: fields, chips,
+  /// outlined and round buttons. 40% ink, 3:1 on the page (WCAG 1.4.11),
+  /// where [line] is 1.7:1.
+  static const edge = Color(0x66F1F0EA);
+
+  /// The ring around whatever has keyboard focus: the page's ink, well over
+  /// 3:1 against the page and against Signal and Flare fills.
+  static const focus = ink;
 
   /// The empty part of a progress bar.
   static const track = Color(0x1AF1F0EA);
@@ -188,12 +197,36 @@ class FzTheme extends ThemeExtension<FzTheme> {
   FzTheme lerp(FzTheme? other, double t) => this;
 }
 
-/// A field's outline. Fields are hairline until focused; the one field a
-/// screen is for (the game code, the answer) is Signal from the start.
-OutlineInputBorder fzFieldBorder(Color color) => OutlineInputBorder(
-  borderRadius: BorderRadius.circular(14),
-  borderSide: BorderSide(color: color, width: 1.5),
-);
+/// A field's outline. Fields are an [FzColors.edge] outline until focused,
+/// then a thicker Signal one; the one field a screen is for (the game code,
+/// the answer) wears a softer Signal from the start ([fzKeyFieldBorder]).
+OutlineInputBorder fzFieldBorder(Color color, {double width = 1.5}) =>
+    OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide(color: color, width: width),
+    );
+
+/// The unfocused outline of the one field a screen is for: Signal, but softer
+/// and thinner than the focused outline, so focus still shows (the focused
+/// one adds a band of full Signal, 13:1 on the page).
+final fzKeyFieldBorder = fzFieldBorder(FzColors.ac.withValues(alpha: .6));
+
+/// A focused field: full Signal, thick enough to read as a change.
+final fzFocusedFieldBorder = fzFieldBorder(FzColors.ac, width: 3);
+
+/// A button's outline while it has keyboard focus: a ring outside its edge,
+/// [FzColors.focus] against the page. [otherwise] is its outline the rest of
+/// the time.
+WidgetStateProperty<BorderSide?> fzFocusRing({BorderSide? otherwise}) =>
+    WidgetStateProperty.resolveWith(
+      (states) => states.contains(WidgetState.focused)
+          ? const BorderSide(
+              color: FzColors.focus,
+              width: 2.5,
+              strokeAlign: BorderSide.strokeAlignOutside,
+            )
+          : otherwise,
+    );
 
 /// The app's single dark theme.
 ThemeData buildFzTheme({
@@ -223,7 +256,7 @@ ThemeData buildFzTheme({
       surface: FzColors.bg,
       onSurface: FzColors.ink,
       onSurfaceVariant: FzColors.dim,
-      outline: FzColors.line,
+      outline: FzColors.edge,
       outlineVariant: FzColors.line,
     ),
     scaffoldBackgroundColor: FzColors.bgDeep,
@@ -237,10 +270,10 @@ ThemeData buildFzTheme({
       errorStyle: fz.m(11, color: FzColors.ac2),
       counterStyle: fz.m(10, color: FzColors.faint),
       contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
-      border: border(FzColors.line),
-      enabledBorder: border(FzColors.line),
-      focusedBorder: border(FzColors.ac),
-      disabledBorder: border(FzColors.panel),
+      border: border(FzColors.edge),
+      enabledBorder: border(FzColors.edge),
+      focusedBorder: fzFocusedFieldBorder,
+      disabledBorder: border(FzColors.line),
       errorBorder: border(FzColors.ac2),
       focusedErrorBorder: border(FzColors.ac2),
     ),
@@ -265,7 +298,12 @@ ThemeData buildFzTheme({
         (states) => selected(states) ? FzColors.ac : FzColors.panel,
       ),
       trackOutlineColor: WidgetStateProperty.resolveWith(
-        (states) => selected(states) ? FzColors.ac : FzColors.line,
+        (states) => selected(states) ? FzColors.ac : FzColors.edge,
+      ),
+      overlayColor: WidgetStateProperty.resolveWith(
+        (states) => states.contains(WidgetState.focused)
+            ? FzColors.focus.withValues(alpha: .4)
+            : null,
       ),
     ),
     // One dialog shape for every dialog: the design's type rather than
@@ -291,10 +329,12 @@ ThemeData buildFzTheme({
             : Colors.transparent,
       ),
       side: WidgetStateBorderSide.resolveWith(
-        (states) => BorderSide(
-          color: selected(states) ? FzColors.ac : FzColors.line,
-          width: 1.5,
-        ),
+        (states) => states.contains(WidgetState.focused)
+            ? const BorderSide(color: FzColors.focus, width: 2.5)
+            : BorderSide(
+                color: selected(states) ? FzColors.ac : FzColors.edge,
+                width: 1.5,
+              ),
       ),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
@@ -305,8 +345,13 @@ ThemeData buildFzTheme({
         foregroundColor: FzColors.ac,
         disabledForegroundColor: FzColors.faint,
         textStyle: fz.h(15, weight: FontWeight.w700),
-        minimumSize: const Size(48, 44),
-      ),
+        minimumSize: const Size(48, 48),
+      ).copyWith(side: fzFocusRing()),
+    ),
+    // Icon buttons without an outline of their own (a field's clear button,
+    // the update banner's close) still show where the keyboard is.
+    iconButtonTheme: IconButtonThemeData(
+      style: ButtonStyle(side: fzFocusRing()),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: FzColors.bgGlow,

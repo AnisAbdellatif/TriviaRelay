@@ -29,7 +29,7 @@ defmodule TriviaRelayWeb.PackControllerTest do
       conn
       |> put_req_header("x-player-id", "p1")
       |> put_req_header("x-player-token", "t")
-      |> put_req_header("x-device-id", "d")
+      |> put_req_header("x-device-id", "0123456789abcdef")
       |> get(~p"/api/packs?q=flags&page=1")
 
     assert %{
@@ -50,7 +50,7 @@ defmodule TriviaRelayWeb.PackControllerTest do
       conn
       |> put_req_header("x-player-id", "p1")
       |> put_req_header("x-player-token", "t")
-      |> put_req_header("x-device-id", "d")
+      |> put_req_header("x-device-id", "0123456789abcdef")
       |> get(path)
     end
 
@@ -92,5 +92,18 @@ defmodule TriviaRelayWeb.PackControllerTest do
 
   test "needs credentials", %{conn: conn} do
     assert %{"code" => "invalid_player"} = conn |> get(~p"/api/packs?q=x") |> json_response(400)
+  end
+
+  test "a search that isn't text is refused, not a crash", %{conn: conn} do
+    Req.Test.stub(TriviaRelay.Sporcle, fn _ -> flunk("Sporcle was called") end)
+
+    conn =
+      conn
+      |> put_req_header("x-player-id", "p1")
+      |> put_req_header("x-player-token", "t")
+      |> put_req_header("x-device-id", "0123456789abcdef")
+      |> get("/api/packs?q[]=x")
+
+    assert %{"code" => "invalid_request"} = json_response(conn, 400)
   end
 end

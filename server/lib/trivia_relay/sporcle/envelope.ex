@@ -50,13 +50,23 @@ defmodule TriviaRelay.Sporcle.Envelope do
   @doc """
   Splits a buffer into complete message bodies, returning `{bodies, rest}` where
   `rest` is an incomplete message still waiting for more bytes.
+
+  A message whose length prefix says it is longer than `max` bytes is
+  `{:error, :too_large}` at once, rather than something to wait for.
   """
-  def split(data, acc \\ []) do
-    with {:ok, len, rest} <- read_varint(data),
-         <<body::binary-size(^len), more::binary>> <- rest do
-      split(more, [body | acc])
-    else
-      _ -> {Enum.reverse(acc), data}
+  def split(data, max \\ :infinity), do: split(data, max, [])
+
+  defp split(data, max, acc) do
+    case read_varint(data) do
+      {:ok, len, _rest} when is_integer(max) and len > max ->
+        {:error, :too_large}
+
+      {:ok, len, rest} when byte_size(rest) >= len ->
+        <<body::binary-size(^len), more::binary>> = rest
+        split(more, max, [body | acc])
+
+      _ ->
+        {Enum.reverse(acc), data}
     end
   end
 

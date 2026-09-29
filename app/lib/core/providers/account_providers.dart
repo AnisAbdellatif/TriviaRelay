@@ -57,11 +57,29 @@ class Account extends _$Account {
       handle: credentials.handle,
       deviceId: deviceId,
     );
+    // A seat somebody else left on this phone is theirs: dropped, not offered.
+    if (await store.seat(account.playerId) == null) await store.saveSeat(null);
     await store.saveAccount(account);
     state = AsyncData(account);
   }
 
+  /// Signs out on purpose: forgets the account and the seat the phone holds
+  /// for it, and stops any connection to that seat, so nothing of this player
+  /// is left for whoever picks the phone up next. Leaving the seat first is
+  /// [CurrentSeat.leave]'s; this only forgets it.
   Future<void> signOut() async {
+    final store = ref.read(appStoreProvider);
+    await store.saveSeat(null);
+    ref.invalidate(seatConnectionProvider);
+    await store.saveAccount(null);
+    state = const AsyncData(null);
+  }
+
+  /// Sporcle no longer takes the token: forgets the account, but keeps the
+  /// seat. A seat doesn't use the token (the relay holds it), so a game in
+  /// progress goes on, and the same player signing in again is offered it
+  /// back. Nobody else is ([AppStore.seat]).
+  Future<void> expire() async {
     await ref.read(appStoreProvider).saveAccount(null);
     state = const AsyncData(null);
   }

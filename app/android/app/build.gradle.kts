@@ -1,30 +1,17 @@
-import java.util.Properties
-
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
 
-// Release signing. The key itself is never in this repository: on a developer
-// machine it comes from android/key.properties (git-ignored), in CI from the
-// environment. See README.md, "Releasing the Android app".
+// Release signing is not done here. Gradle runs plugins and downloads code this
+// repository does not control, so the release key is never where Gradle can see it:
+// `scripts/ci.sh apk` builds the release APK unsigned, and `scripts/ci.sh sign` signs it
+// afterwards with only the Android build-tools' `zipalign` and `apksigner` (in CI, in
+// another job on another machine). See README.md, "Releasing the Android app".
 //
-// Every release APK has to be signed with the *same* key, or Android refuses to
-// install one over another — which would break updating, since the app hands
-// its own updates out (lib/core/update/).
-val keyProperties = Properties().apply {
-    val file = rootProject.file("key.properties")
-    if (file.exists()) file.inputStream().use { load(it) }
-}
-
-fun signingValue(property: String, variable: String): String? =
-    (System.getenv(variable) ?: keyProperties.getProperty(property))?.takeIf { it.isNotBlank() }
-
-val keystorePath = signingValue("storeFile", "ANDROID_KEYSTORE_PATH")
-
-// Only the two release paths — `scripts/ci.sh apk` and `scripts/ci.sh aab` — build the
-// app people install, and they say so with TRIVIA_RELAY_RELEASE_BUILD=1. Everything else
+// Only the release path — `scripts/ci.sh apk`, then `scripts/ci.sh sign` — builds the
+// app people install, and it says so with TRIVIA_RELAY_RELEASE_BUILD=1. Everything else
 // (`flutter run`, a hand-built `flutter build apk`) is a development build: a different
 // application id and name, so it installs beside the GitHub release instead of
 // colliding with it. A collision is not an upgrade either way: the signatures differ,
@@ -75,35 +62,12 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            if (keystorePath != null) {
-                storeFile = file(keystorePath)
-                storePassword = signingValue("storePassword", "ANDROID_KEYSTORE_PASSWORD")
-                keyAlias = signingValue("keyAlias", "ANDROID_KEY_ALIAS")
-                // keytool has produced PKCS12 keystores since Java 9, and PKCS12 has no
-                // per-entry password: it encrypts the key with the store password and
-                // ignores `-keypass` with a warning that is easy to miss. So the key
-                // password falls back to the store password rather than being required —
-                // the alternative is an UnrecoverableKeyException at release time for
-                // someone who typed two different passwords at the keytool prompts.
-                keyPassword = signingValue("keyPassword", "ANDROID_KEY_PASSWORD")
-                    ?: storePassword
-            }
-        }
-    }
-
     buildTypes {
         release {
-            // Falling back to the debug key keeps `flutter run --release` working for
-            // someone who has no keystore. It is deliberately not an error here:
-            // `scripts/ci.sh apk`, the only supported way to build an APK for other
-            // people, refuses to run without the real key.
-            signingConfig = if (keystorePath != null) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // The release build is left unsigned for `scripts/ci.sh sign` (above). Anything
+            // else built as release (`flutter run --release`) is signed with the debug key,
+            // so it still installs for someone who has no release key.
+            signingConfig = if (releaseBuild) null else signingConfigs.getByName("debug")
         }
     }
 }

@@ -5,3 +5,14 @@ erl_crash.dump
 
 # deploy-kit: personal overrides
 .kamal/kit.local.env
+
+# Secrets that must never be committed, wherever they end up. The committed
+# examples (`*.env.example`) and the kit's settings (`.kamal/kit.env`,
+# `.kamal/secrets-common`, which holds references, not values) are not matched.
+*.jks
+*.keystore
+*.p12
+key.properties
+.env
+.kamal/secrets
+deploy/.env

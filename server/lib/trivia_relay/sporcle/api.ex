@@ -25,7 +25,16 @@ defmodule TriviaRelay.Sporcle.Api do
   }
   @pack_list_order ~w(popular fresh bookmarked created friends purchased free all)
 
-  def constants, do: %{"pack_lists" => @pack_list_order}
+  # The official app's join screen, by our name: the lists `getJoinableGames` answers with
+  # (confirmed live), in the order they're shown.
+  @game_lists [
+    {"invited", "invitedGames"},
+    {"friends", "friendGames"},
+    {"public", "publicGames"}
+  ]
+
+  def constants,
+    do: %{"pack_lists" => @pack_list_order, "game_lists" => Enum.map(@game_lists, &elem(&1, 0))}
 
   @doc "Pack metadata (name, question count, image); never the questions."
   def get_pack(%Cred{} = cred, pack_id) do
@@ -59,6 +68,18 @@ defmodule TriviaRelay.Sporcle.Api do
     with {:ok, body} <- request(cred, :get, "/searchPacks", params: params) do
       data = body["data"] || body
       {:ok, data["packs"] || []}
+    end
+  end
+
+  @doc """
+  The games this player could join, as the official app's join screen lists them. Returns
+  `{:ok, [{list, games}]}` in `constants/0`'s order, each game the map Sporcle sent
+  (`gameCode`, `gamePack`, `gameScreen`, `host`, `playerCount`, …).
+  """
+  def joinable_games(%Cred{} = cred) do
+    with {:ok, body} <- request(cred, :get, "/getJoinableGames", []) do
+      data = body["data"] || body
+      {:ok, for({list, key} <- @game_lists, do: {list, List.wrap(data[key])})}
     end
   end
 

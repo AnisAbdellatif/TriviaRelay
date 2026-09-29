@@ -2,6 +2,7 @@ defmodule TriviaRelayWeb.SporcleErrors do
   @moduledoc "How a failed call to Sporcle is told to the phone (`protocol/PROTOCOL.md` §3)."
 
   alias TriviaRelayWeb.ApiError
+  alias TriviaRelayWeb.Plugs.RateLimit
 
   def send(conn, {:error, :invalid_player}),
     do: ApiError.send(conn, :bad_request, "invalid_player", "Sign in to Sporcle first.")
@@ -34,14 +35,55 @@ defmodule TriviaRelayWeb.SporcleErrors do
   def send(conn, {:error, {:refused, body}}),
     do: ApiError.send(conn, :conflict, "game_refused", refusal(body))
 
-  def send(conn, _error),
+  def send(conn, {:error, :rate_limited}), do: RateLimit.refuse(conn, 60)
+
+  # Too many calls to Sporcle already waiting on it (TriviaRelay.Sporcle.Http).
+  def send(conn, {:error, :busy}),
     do:
-      ApiError.send(
-        conn,
-        :bad_gateway,
-        "sporcle_unavailable",
-        "Sporcle didn't answer. Try again in a moment."
+      conn
+      |> Plug.Conn.put_resp_header("retry-after", "5")
+      |> ApiError.send(
+        :service_unavailable,
+        "relay_busy",
+        "The relay is busy. Try again in a moment."
       )
+
+  # The relay holds as many seats as it can (TriviaRelay.Seats, `:seats_full`); any other
+  # way of saying so (the supervisor's own `max_children`) is told the same.
+  def send(conn, {:error, reason}) when is_atom(reason) or is_tuple(reason) do
+    if full?(reason) do
+      conn
+      |> Plug.Conn.put_resp_header("retry-after", "60")
+      |> ApiError.send(
+        :service_unavailable,
+        "seats_full",
+        "The relay is full right now. Try again in a few minutes."
+      )
+    else
+      unavailable(conn)
+    end
+  end
+
+  def send(conn, _error), do: unavailable(conn)
+
+  defp unavailable(conn) do
+    ApiError.send(
+      conn,
+      :bad_gateway,
+      "sporcle_unavailable",
+      "Sporcle didn't answer. Try again in a moment."
+    )
+  end
+
+  # `:seats_full`, DynamicSupervisor's `max_children`, or any reason that says it is full.
+  defp full?(:seats_full), do: true
+  defp full?({:seat_failed, reason}), do: full?(reason)
+  defp full?(:max_children), do: true
+
+  defp full?(reason) when is_atom(reason),
+    do: reason |> Atom.to_string() |> String.contains?("full")
+
+  defp full?(_reason), do: false
 
   # What Sporcle said when it answered 200 without a player session: a game that doesn't
   # exist, a full game, a guest account. Passed on as it came, since only it knows.

@@ -14,15 +14,18 @@ import 'pump.dart';
 const fixtureNow = 1790000000000;
 
 /// Pumps [home] as the app would show it, at a phone's size unless [size] says
-/// otherwise, with [connection] as the seat.
+/// otherwise, with [connection] as the seat, [prefs] as what the device
+/// kept, and [clock] as the time (the fixtures' moment by default).
 Future<void> pumpApp(
   WidgetTester tester,
   Widget home, {
   FakeSeatConnection? connection,
   Size size = const Size(360, 740),
   List overrides = const [],
+  Map<String, Object> prefs = const {},
+  DateTime Function()? clock,
 }) async {
-  SharedPreferences.setMockInitialValues({});
+  SharedPreferences.setMockInitialValues(prefs);
   tester.view.physicalSize = size;
   tester.view.devicePixelRatio = 1;
   addTearDown(tester.view.reset);
@@ -33,7 +36,7 @@ Future<void> pumpApp(
         if (connection != null)
           seatConnectionProvider.overrideWithValue(connection),
         clockProvider.overrideWithValue(
-          () => DateTime.fromMillisecondsSinceEpoch(fixtureNow),
+          clock ?? () => DateTime.fromMillisecondsSinceEpoch(fixtureNow),
         ),
         ...overrides,
       ],

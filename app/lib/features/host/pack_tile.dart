@@ -72,9 +72,8 @@ class PackTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final description = pack.description?.trim() ?? '';
-    return InkWell(
+    return FzTile(
       key: Key('pack-${pack.id}'),
-      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: FzPanel(
         borderColor: selected ? FzColors.ac : null,
@@ -117,7 +116,11 @@ class PackTile extends StatelessWidget {
             if (selected && trailing == null)
               const Padding(
                 padding: EdgeInsets.only(left: 10),
-                child: Icon(Icons.check_circle, color: FzColors.ac),
+                child: Icon(
+                  Icons.check_circle,
+                  color: FzColors.ac,
+                  semanticLabel: 'Chosen',
+                ),
               ),
           ],
         ),

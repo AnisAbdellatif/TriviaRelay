@@ -215,6 +215,28 @@ defmodule TriviaRelay.Seats.IntentsTest do
     assert s.players[s.peer_id].ready
   end
 
+  test "a ready that changes nothing isn't sent on" do
+    s = Replay.fresh(:lobby)
+    assert s.players[s.peer_id].ready
+    assert {:ok, [], ^s} = Intents.handle(s, "ready", %{"ready" => true})
+  end
+
+  test "only players in the game can be judged" do
+    s = Replay.fresh(:reveal)
+
+    assert {:error, "invalid_intent"} =
+             Intents.handle(s, "judge", %{"peer_id" => 99, "correct" => true})
+
+    assert s.judgements == %{}
+  end
+
+  test "a final wager Sporcle already has counts as placed" do
+    # The seat didn't place it itself (a new seat, say), but Sporcle lists it.
+    s = Replay.first(&(&1.phase == :final_wager and Map.has_key?(&1.final.wagers, 1)))
+    assert s.final.wager == nil
+    assert {:error, "already_wagered"} = Intents.handle(s, "final_wager", %{"amount" => 10})
+  end
+
   test "nothing goes to Sporcle before the seat is connected" do
     assert {:error, "not_live"} =
              Intents.handle(State.new("sporcle_id//x"), "ready", %{"ready" => true})

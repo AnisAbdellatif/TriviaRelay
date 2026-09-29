@@ -1,7 +1,10 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
+import '../../core/providers/connection_providers.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/countdown.dart';
 import '../../shared/widgets/fz.dart';
@@ -18,9 +21,14 @@ class FinalVoteView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final pending = ref.watch(pendingIntentsProvider);
+    final sending = pending['vote'] as String?;
     final vote = state.finalRound?.vote;
     final votes = state.finalRound?.votes ?? const {};
 
+    // The vote cast is shown chosen, with a check, not greyed out like the
+    // two left behind.
     Widget choice(String value) => Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: FzButton(
@@ -29,9 +37,19 @@ class FinalVoteView extends ConsumerWidget {
         trailing: vote == value
             ? 'your vote'
             : '${votes[value] ?? 0} vote${votes[value] == 1 ? '' : 's'}',
-        kind: vote == value ? FzButtonKind.pink : FzButtonKind.outline,
-        onPressed: vote == null
-            ? () => act(context, ref, (c) => c.finalVote(value))
+        kind: vote == value || sending == value
+            ? FzButtonKind.pink
+            : FzButtonKind.outline,
+        selected: vote == value,
+        busy: sending == value,
+        onPressed: vote == null && sending == null && canAct
+            ? () => act(
+                context,
+                ref,
+                (c) => c.finalVote(value),
+                pending: 'vote',
+                value: value,
+              )
             : null,
       ),
     );
@@ -42,7 +60,10 @@ class FinalVoteView extends ConsumerWidget {
               key: const Key('nextButton'),
               label: 'Move on without the rest',
               kind: FzButtonKind.outline,
-              onPressed: () => act(context, ref, (c) => c.next()),
+              busy: pending.containsKey('next'),
+              onPressed: canAct
+                  ? () => act(context, ref, (c) => c.next(), pending: 'next')
+                  : null,
             )
           : null,
       child: Column(
@@ -87,6 +108,9 @@ class FinalWagerView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final pending = ref.watch(pendingIntentsProvider);
+    final sending = pending['wager'] as int?;
     final mine = state.finalRound?.wager;
     final picked = state.finalRound?.picked;
     final wagered = state.players.where((p) => p.finalWagered).length;
@@ -98,7 +122,10 @@ class FinalWagerView extends ConsumerWidget {
               label: 'Ask the final question',
               trailing: '$wagered/${state.players.length} wagered',
               kind: FzButtonKind.pink,
-              onPressed: () => act(context, ref, (c) => c.next()),
+              busy: pending.containsKey('next'),
+              onPressed: canAct
+                  ? () => act(context, ref, (c) => c.next(), pending: 'next')
+                  : null,
             )
           : null,
       child: Column(
@@ -129,9 +156,15 @@ class FinalWagerView extends ConsumerWidget {
                   child: _WagerTile(
                     key: Key('finalWager-$amount'),
                     amount: amount,
-                    chosen: mine == amount,
-                    onPressed: mine == null
-                        ? () => act(context, ref, (c) => c.finalWager(amount))
+                    chosen: mine == amount || sending == amount,
+                    onPressed: mine == null && sending == null && canAct
+                        ? () => act(
+                            context,
+                            ref,
+                            (c) => c.finalWager(amount),
+                            pending: 'wager',
+                            value: amount,
+                          )
                         : null,
                   ),
                 ),
@@ -166,6 +199,8 @@ class FinalScoresView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final asking = ref.watch(pendingIntentsProvider).containsKey('playAgain');
     final standings = state.standings;
     final top = standings.isEmpty ? null : standings.first.score;
     final winners = standings.where((p) => p.score == top).toList();
@@ -179,9 +214,11 @@ class FinalScoresView extends ConsumerWidget {
             ? 'Waiting for the host'
             : 'Play again',
         trailing: state.you.playedAgain ? null : 'same room',
-        onPressed: state.you.playedAgain
+        busy: asking,
+        onPressed: state.you.playedAgain || !canAct
             ? null
-            : () => act(context, ref, (c) => c.playAgain()),
+            : () =>
+                  act(context, ref, (c) => c.playAgain(), pending: 'playAgain'),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,20 +266,26 @@ class _WagerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
-    return OutlinedButton(
+    final button = OutlinedButton(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(88),
-        padding: EdgeInsets.zero,
-        backgroundColor: chosen
-            ? FzColors.ac2.withValues(alpha: .14)
-            : Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(
-          color: chosen ? FzColors.ac2 : FzColors.line,
-          width: 1.5,
-        ),
-      ),
+      style:
+          OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(88),
+            padding: EdgeInsets.zero,
+            backgroundColor: chosen
+                ? FzColors.ac2.withValues(alpha: .14)
+                : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ).copyWith(
+            side: fzFocusRing(
+              otherwise: BorderSide(
+                color: chosen ? FzColors.ac2 : FzColors.edge,
+                width: 1.5,
+              ),
+            ),
+          ),
       child: Text(
         '$amount',
         style: fz.m(
@@ -253,6 +296,7 @@ class _WagerTile extends StatelessWidget {
         ),
       ),
     );
+    return Semantics(selected: chosen, child: button);
   }
 }
 
@@ -272,7 +316,11 @@ class _Winners extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = winners.length == 1 ? 96.0 : 72.0;
+    // Each avatar is ringed (16px) and spaced (18px); a tie of three shrinks
+    // them to fit a narrow phone rather than running off it.
+    final room = math.min(MediaQuery.sizeOf(context).width, 480) - 44;
+    final fit = (room - 18 * (winners.length - 1)) / winners.length - 16;
+    final size = math.min(winners.length == 1 ? 96.0 : 72.0, fit);
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,

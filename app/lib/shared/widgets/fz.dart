@@ -1,4 +1,7 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 
 import '../theme/fz_theme.dart';
 import 'fz_motion.dart';
@@ -32,22 +35,27 @@ class FzBackground extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final arcs = this.arcs;
-    return Stack(
-      // Tight constraints for [child], as it had when it was the painter's
-      // child: a Stack loosens its non-positioned children by default, and a
-      // loose width would stop every `stretch` Column filling the screen.
-      fit: StackFit.expand,
-      children: [
-        const Positioned.fill(child: ColoredBox(color: FzColors.bgDeep)),
-        if (arcs != null)
-          // Centred just off the top right corner, as in the design.
-          Positioned(
-            top: -30 - _corner.radius,
-            right: 10 - _corner.radius,
-            child: RepaintBoundary(child: _corner.withColor(arcs)),
-          ),
-        child,
-      ],
+    // The page is a Material, not a painted box: ink (a tile's splash, its
+    // hover and focus wash) is drawn on the nearest Material, and an opaque
+    // box above the Scaffold's hid all of it.
+    return Material(
+      color: FzColors.bgDeep,
+      child: Stack(
+        // Tight constraints for [child], as it had when it was the painter's
+        // child: a Stack loosens its non-positioned children by default, and
+        // a loose width would stop every `stretch` Column filling the screen.
+        fit: StackFit.expand,
+        children: [
+          if (arcs != null)
+            // Centred just off the top right corner, as in the design.
+            Positioned(
+              top: -30 - _corner.radius,
+              right: 10 - _corner.radius,
+              child: RepaintBoundary(child: _corner.withColor(arcs)),
+            ),
+          child,
+        ],
+      ),
     );
   }
 }
@@ -237,13 +245,80 @@ class FzAccentBars extends StatelessWidget {
   }
 }
 
-/// Phone-width column: scrolling [child] with an optional [footer] pinned to
-/// the bottom. No background; use inside [FzPage] or a game shell.
-class FzBody extends StatelessWidget {
-  const FzBody({super.key, required this.child, this.footer});
+/// Phone-width column: scrolling [child], an optional [top] pinned above it
+/// and an optional [footer] pinned below it. No background; use inside
+/// [FzPage] or a game shell.
+///
+/// The footer is pinned while that leaves the content room to be read. When it
+/// wouldn't (a phone on its side, large text, an open keyboard, a footer of
+/// several buttons), it scrolls with the content instead, after it: a pinned
+/// footer taller than the screen left nothing to scroll, and in landscape a
+/// sliver of page.
+class FzBody extends StatefulWidget {
+  const FzBody({
+    super.key,
+    required this.child,
+    this.footer,
+    this.top,
+    this.header,
+  });
 
   final Widget child;
   final Widget? footer;
+
+  /// Kept in view above the scrolling content (the question clock).
+  final Widget? top;
+
+  /// A screen's own top row ([FzPage]'s). Pinned while there is room; on a
+  /// short screen (a phone on its side, the keyboard up) it scrolls away with
+  /// the content, since every one of them has a system back as well.
+  final Widget? header;
+
+  /// Below this height the [header] scrolls with the content.
+  static const shortHeight = 480.0;
+
+  /// Whether a footer [footer] tall can stay pinned in [available] height: it
+  /// must leave the content more than half of it, and never less than 240px.
+  static bool footerFits({required double available, required double footer}) =>
+      available - footer >= math.max(240, available * .55);
+
+  @override
+  State<FzBody> createState() => _FzBodyState();
+}
+
+class _FzBodyState extends State<FzBody> {
+  static const _side = 22.0;
+
+  /// The footer's height, and the part of the height the pinned top takes,
+  /// as last laid out. Neither depends on where the footer sits, so the
+  /// choice made from them is stable.
+  double? _footer;
+  double _above = 0;
+
+  /// The choice the last build made, and the height it had to go on.
+  bool _inline = false;
+  double _height = double.infinity;
+  bool _rechecking = false;
+
+  bool _decide(double height) {
+    final footer = _footer;
+    if (footer == null) return false;
+    return !FzBody.footerFits(available: height - _above, footer: footer);
+  }
+
+  /// A new measurement that changes the choice (the first layout, a footer
+  /// that grew) rebuilds once the frame is done. A change of room (the
+  /// keyboard, a turned phone) needs none: the build it causes decides with
+  /// the room it has, in the same frame, so a field that scrolls itself into
+  /// view above the keyboard does it against the final layout.
+  void _measured() {
+    if (_rechecking || _decide(_height) == _inline) return;
+    _rechecking = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rechecking = false;
+      if (mounted) setState(() {});
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -251,28 +326,204 @@ class FzBody extends StatelessWidget {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(22, 12, 22, 16),
-                child: child,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            _height = constraints.maxHeight;
+            final inline = _inline = _decide(_height);
+            final header = widget.header == null
+                ? null
+                : _ordered(
+                    1,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(_side, 12, _side, 0),
+                      child: widget.header,
+                    ),
+                  );
+            final headerInline = header != null && _height < FzBody.shortHeight;
+            final footer = widget.footer == null
+                ? null
+                : _ordered(
+                    4,
+                    _ReportHeight(
+                      onHeight: (height) {
+                        _footer = height;
+                        _measured();
+                      },
+                      child: widget.footer!,
+                    ),
+                  );
+            final top = widget.top == null
+                ? null
+                : _ordered(
+                    2,
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(_side, 8, _side, 4),
+                      child: widget.top,
+                    ),
+                  );
+            final above = [if (header != null && !headerInline) header, ?top];
+            final scroll = SingleChildScrollView(
+              // The content keeps its key wherever the header and footer go,
+              // so moving them never rebuilds it: a focused field in it
+              // would lose its focus, and with it the keyboard that made the
+              // move.
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  if (headerInline)
+                    KeyedSubtree(key: _headerKey, child: header),
+                  KeyedSubtree(
+                    key: _contentKey,
+                    child: _ordered(
+                      3,
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(
+                          _side,
+                          12,
+                          _side,
+                          16,
+                        ),
+                        child: widget.child,
+                      ),
+                    ),
+                  ),
+                  if (footer != null && inline)
+                    KeyedSubtree(
+                      key: _footerKey,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(_side, 6, _side, 22),
+                        child: footer,
+                      ),
+                    ),
+                ],
               ),
-            ),
-            if (footer != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(22, 8, 22, 22),
-                child: footer,
+            );
+            // Tab goes header and clock, then content, then footer, each
+            // read in its own order: by position alone, content scrolled
+            // under a pinned footer was visited in among its buttons.
+            return FocusTraversalGroup(
+              policy: OrderedTraversalPolicy(),
+              child: ClipRect(
+                child: CustomMultiChildLayout(
+                  delegate: _BodyLayout(),
+                  children: [
+                    if (above.isNotEmpty)
+                      LayoutId(
+                        id: _BodySlot.top,
+                        child: _ReportHeight(
+                          onHeight: (height) {
+                            _above = height;
+                            _measured();
+                          },
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: above,
+                          ),
+                        ),
+                      ),
+                    LayoutId(id: _BodySlot.scroll, child: scroll),
+                    if (footer != null && !inline)
+                      LayoutId(
+                        id: _BodySlot.footer,
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(
+                            _side,
+                            8,
+                            _side,
+                            22,
+                          ),
+                          child: footer,
+                        ),
+                      ),
+                  ],
+                ),
               ),
-          ],
+            );
+          },
         ),
       ),
     );
   }
+
+  /// One region of the page for the keyboard: read in its own order, and
+  /// [order]th among the regions.
+  static Widget _ordered(double order, Widget child) => FocusTraversalOrder(
+    order: NumericFocusOrder(order),
+    child: FocusTraversalGroup(child: child),
+  );
+
+  static const _headerKey = ValueKey('header');
+  static const _contentKey = ValueKey('content');
+  static const _footerKey = ValueKey('footer');
 }
 
-/// Full screen: background, safe area, optional [header] row, [FzBody].
+enum _BodySlot { top, scroll, footer }
+
+/// Top, then the footer at its natural height at the bottom, then the scroll
+/// in what is left. Never reports an overflow: a footer taller than the room
+/// is drawn cut off for the one frame before [FzBody] moves it into the
+/// scroll.
+class _BodyLayout extends MultiChildLayoutDelegate {
+  @override
+  void performLayout(Size size) {
+    final width = BoxConstraints.tightFor(width: size.width);
+    var top = 0.0;
+    if (hasChild(_BodySlot.top)) {
+      top = layoutChild(_BodySlot.top, width).height;
+      positionChild(_BodySlot.top, Offset.zero);
+    }
+    final available = math.max(0.0, size.height - top);
+    var footer = 0.0;
+    if (hasChild(_BodySlot.footer)) {
+      footer = math.min(available, layoutChild(_BodySlot.footer, width).height);
+      positionChild(_BodySlot.footer, Offset(0, size.height - footer));
+    }
+    layoutChild(
+      _BodySlot.scroll,
+      BoxConstraints.tightFor(
+        width: size.width,
+        height: math.max(0.0, available - footer),
+      ),
+    );
+    positionChild(_BodySlot.scroll, Offset(0, top));
+  }
+
+  @override
+  bool shouldRelayout(_BodyLayout oldDelegate) => false;
+}
+
+/// Tells [onHeight] its child's height after every layout.
+class _ReportHeight extends SingleChildRenderObjectWidget {
+  const _ReportHeight({required this.onHeight, super.child});
+
+  final ValueChanged<double> onHeight;
+
+  @override
+  RenderObject createRenderObject(BuildContext context) =>
+      _RenderReportHeight(onHeight);
+
+  @override
+  void updateRenderObject(
+    BuildContext context,
+    _RenderReportHeight renderObject,
+  ) => renderObject.onHeight = onHeight;
+}
+
+class _RenderReportHeight extends RenderProxyBox {
+  _RenderReportHeight(this.onHeight);
+
+  ValueChanged<double> onHeight;
+
+  @override
+  void performLayout() {
+    super.performLayout();
+    onHeight(size.height);
+  }
+}
+
+/// Full screen: background, safe area, and [FzBody] with an optional [header]
+/// row.
 class FzPage extends StatelessWidget {
   const FzPage({super.key, required this.child, this.header, this.footer});
 
@@ -284,25 +535,7 @@ class FzPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return FzBackground(
       child: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (header != null)
-              Align(
-                alignment: Alignment.topCenter,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 480),
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
-                    child: header,
-                  ),
-                ),
-              ),
-            Expanded(
-              child: FzBody(footer: footer, child: child),
-            ),
-          ],
-        ),
+        child: FzBody(header: header, footer: footer, child: child),
       ),
     );
   }
@@ -313,6 +546,10 @@ enum FzButtonKind { primary, pink, outline }
 /// The design's big rounded buttons: flat Signal or Flare, or a hairline
 /// outline. Built on Material buttons so disabled state and semantics come for
 /// free.
+///
+/// The label always wins the room: the [trailing] hint moves under it when the
+/// two don't fit on one line (large text, a narrow phone), rather than cutting
+/// the label short.
 class FzButton extends StatelessWidget {
   const FzButton({
     super.key,
@@ -324,6 +561,8 @@ class FzButton extends StatelessWidget {
     this.fontSize = 17,
     this.radius = 16,
     this.expand = true,
+    this.selected = false,
+    this.busy = false,
   });
 
   final String label;
@@ -337,13 +576,23 @@ class FzButton extends StatelessWidget {
   final double radius;
   final bool expand;
 
+  /// The choice made (a final vote): drawn in its colour with a check, never
+  /// greyed out, and not pressed again.
+  final bool selected;
+
+  /// Sent, waiting on the relay: drawn as it was, with a spinner in place of
+  /// the hint, and not pressed again until the answer comes.
+  final bool busy;
+
   @override
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
-    final enabled = onPressed != null;
+    // Selected and busy look live but take no press.
+    final live = onPressed != null || selected || busy;
+    final press = selected || busy ? null : onPressed;
     final filled = kind != FzButtonKind.outline;
     final fill = kind == FzButtonKind.pink ? FzColors.ac2 : FzColors.ac;
-    final fg = !enabled
+    final fg = !live
         ? FzColors.faint
         : filled
         ? FzColors.bgDeep
@@ -352,108 +601,96 @@ class FzButton extends StatelessWidget {
       borderRadius: BorderRadius.circular(radius),
     );
     final minimumSize = Size(expand ? double.infinity : 0, height);
-    const padding = EdgeInsets.symmetric(horizontal: 22);
+    const padding = EdgeInsets.symmetric(horizontal: 22, vertical: 8);
 
-    final content = Row(
-      mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
-      mainAxisAlignment: trailing == null
-          ? MainAxisAlignment.center
-          : MainAxisAlignment.spaceBetween,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: fz.h(fontSize, color: fg),
-          ),
-        ),
-        if (trailing != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
-            child: Text(
-              trailing!,
-              style: fz.m(
-                13,
-                color: filled ? fg.withValues(alpha: .75) : FzColors.dim,
-              ),
+    final Widget? hint = busy
+        ? SizedBox.square(
+            dimension: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+          )
+        : trailing == null
+        ? null
+        : Text(
+            trailing!,
+            style: fz.m(
+              13,
+              // Full strength on a fill: at 75% the hint was 4.4:1 on Flare.
+              color: filled || !live ? fg : FzColors.dim,
             ),
-          ),
-      ],
+          );
+    final text = Text(
+      label,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+      textAlign: hint == null ? TextAlign.center : TextAlign.start,
+      style: fz.h(fontSize, color: fg),
     );
+    final title = selected
+        ? Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.check_circle, size: 20, color: fg),
+              const SizedBox(width: 8),
+              Flexible(child: text),
+            ],
+          )
+        : text;
 
-    return filled
+    Widget content = hint == null
+        ? title
+        : Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 2,
+            children: [title, hint],
+          );
+    // A Wrap is only as wide as its longest line; spreading the hint to the
+    // far edge needs the button's whole width.
+    if (hint != null && expand) {
+      content = SizedBox(width: double.infinity, child: content);
+    }
+
+    final button = filled
         ? FilledButton(
-            onPressed: onPressed,
+            onPressed: press,
             style: FilledButton.styleFrom(
               backgroundColor: fill,
               foregroundColor: FzColors.bgDeep,
-              disabledBackgroundColor: FzColors.panel,
-              disabledForegroundColor: FzColors.faint,
+              disabledBackgroundColor: live ? fill : FzColors.panel,
+              disabledForegroundColor: live ? FzColors.bgDeep : fg,
               minimumSize: minimumSize,
               padding: padding,
               shape: shape,
               elevation: 0,
-            ),
+            ).copyWith(side: fzFocusRing()),
             child: content,
           )
         : OutlinedButton(
-            onPressed: onPressed,
-            style: OutlinedButton.styleFrom(
-              foregroundColor: FzColors.ink,
-              minimumSize: minimumSize,
-              padding: padding,
-              shape: shape,
-              side: const BorderSide(color: FzColors.line, width: 1.5),
-            ),
+            onPressed: press,
+            style:
+                OutlinedButton.styleFrom(
+                  foregroundColor: FzColors.ink,
+                  disabledForegroundColor: fg,
+                  minimumSize: minimumSize,
+                  padding: padding,
+                  shape: shape,
+                ).copyWith(
+                  side: fzFocusRing(
+                    otherwise: BorderSide(
+                      color: live ? FzColors.edge : FzColors.line,
+                      width: 1.5,
+                    ),
+                  ),
+                ),
             child: content,
           );
+    if (!selected) return button;
+    return MergeSemantics(child: Semantics(selected: true, child: button));
   }
 }
 
-/// Small outlined pill ("Share", "Pause").
-class FzPill extends StatelessWidget {
-  const FzPill({
-    super.key,
-    required this.label,
-    required this.onPressed,
-    this.icon,
-    this.color = FzColors.dim,
-  });
-
-  final String label;
-  final VoidCallback? onPressed;
-  final IconData? icon;
-  final Color color;
-
-  @override
-  Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
-    final fg = onPressed == null ? FzColors.faint : color;
-    return OutlinedButton(
-      onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        foregroundColor: color,
-        disabledForegroundColor: FzColors.faint,
-        minimumSize: const Size(0, 36),
-        padding: const EdgeInsets.symmetric(horizontal: 14),
-        shape: const StadiumBorder(),
-        side: const BorderSide(color: FzColors.line),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 6),
-          ],
-          Text(label, style: fz.m(11, color: fg, tracking: .04)),
-        ],
-      ),
-    );
-  }
-}
-
-/// Round 44px outlined icon button (back, leave, settings).
+/// Round 44px outlined icon button (back, leave, settings), in a 48px target.
 class FzCircleButton extends StatelessWidget {
   const FzCircleButton({
     super.key,
@@ -472,12 +709,63 @@ class FzCircleButton extends StatelessWidget {
       tooltip: tooltip,
       onPressed: onPressed,
       icon: Icon(icon, size: 18),
-      style: IconButton.styleFrom(
-        foregroundColor: FzColors.ink,
-        fixedSize: const Size(44, 44),
-        minimumSize: const Size(44, 44),
-        side: const BorderSide(color: FzColors.line, width: 1.5),
-        shape: const CircleBorder(),
+      style:
+          IconButton.styleFrom(
+            foregroundColor: FzColors.ink,
+            fixedSize: const Size(44, 44),
+            minimumSize: const Size(44, 44),
+            shape: const CircleBorder(),
+          ).copyWith(
+            side: fzFocusRing(
+              otherwise: const BorderSide(color: FzColors.edge, width: 1.5),
+            ),
+          ),
+    );
+  }
+}
+
+/// A tappable card or row: ink on press and hover, and a ring while it has
+/// keyboard focus, which Material's faint focus wash alone didn't show.
+///
+/// It brings its own transparent Material, so the ink shows whatever is
+/// painted behind the tile.
+class FzTile extends StatefulWidget {
+  const FzTile({
+    super.key,
+    required this.onTap,
+    required this.child,
+    this.radius = 16,
+  });
+
+  final VoidCallback? onTap;
+  final Widget child;
+  final double radius;
+
+  @override
+  State<FzTile> createState() => _FzTileState();
+}
+
+class _FzTileState extends State<FzTile> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final radius = BorderRadius.circular(widget.radius);
+    return Material(
+      type: MaterialType.transparency,
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: radius,
+        onFocusChange: (focused) => setState(() => _focused = focused),
+        child: Container(
+          foregroundDecoration: _focused
+              ? BoxDecoration(
+                  borderRadius: radius,
+                  border: Border.all(color: FzColors.focus, width: 2.5),
+                )
+              : null,
+          child: widget.child,
+        ),
       ),
     );
   }
@@ -490,16 +778,26 @@ class FzEyebrow extends StatelessWidget {
     super.key,
     this.color = FzColors.dim,
     this.size = 11,
+    this.maxLines,
   });
 
   final String text;
   final Color color;
   final double size;
 
+  /// Cut short with an ellipsis past this many lines; unlimited if null.
+  final int? maxLines;
+
+  static TextStyle style(BuildContext context, {double size = 11}) =>
+      FzTheme.of(context).m(size, tracking: .16);
+
   @override
   Widget build(BuildContext context) {
     return Text(
       text.toUpperCase(),
+      maxLines: maxLines,
+      softWrap: maxLines != 1,
+      overflow: maxLines == null ? null : TextOverflow.ellipsis,
       style: FzTheme.of(context).m(size, color: color, tracking: .16),
     );
   }
@@ -565,12 +863,17 @@ class FzAvatar extends StatelessWidget {
     required this.name,
     this.hue,
     this.size = 46,
+    this.away = false,
   });
 
   final String id;
   final String name;
   final int? hue;
   final double size;
+
+  /// Not connected: the colour fades and the initial turns light, so the
+  /// letter stays readable (a faded whole avatar left it at 1.4:1).
+  final bool away;
 
   static Color colorForHue(int hue) =>
       HSLColor.fromAHSL(1, (hue % 360).toDouble(), .9, .72).toColor();
@@ -589,17 +892,25 @@ class FzAvatar extends StatelessWidget {
     final initial = trimmed.isEmpty
         ? '?'
         : trimmed.characters.first.toUpperCase();
+    final color = hue == null ? colorFor(id) : colorForHue(hue!);
     return Container(
       width: size,
       height: size,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: hue == null ? colorFor(id) : colorForHue(hue!),
+        color: away ? color.withValues(alpha: .28) : color,
         shape: BoxShape.circle,
+        border: away
+            ? Border.all(color: color.withValues(alpha: .6), width: 1.5)
+            : null,
       ),
-      child: Text(
-        initial,
-        style: FzTheme.of(context).h(size * .42, color: FzColors.bgDeep),
+      // The name is always beside it; the initial read out as well was noise.
+      child: ExcludeSemantics(
+        child: Text(
+          initial,
+          style: FzTheme.of(context)
+              .h(size * .42, color: away ? FzColors.ink : FzColors.bgDeep),
+        ),
       ),
     );
   }
@@ -680,50 +991,6 @@ class _FzBlinkState extends State<FzBlink> with SingleTickerProviderStateMixin {
         end: .35,
       ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut)),
       child: widget.child,
-    );
-  }
-}
-
-/// One-shot entrance: fade + scale from .92 (the design's `pop`), or a 10px
-/// rise when [rise] is true.
-///
-/// [delay] holds it still first, so a list can be given one per row and land
-/// as a run rather than all at once. The delay is folded into the one
-/// animation as a leading flat stretch, which keeps this a single cheap
-/// `TweenAnimationBuilder` and means nothing is left pending if the widget
-/// goes away early.
-class FzEnter extends StatelessWidget {
-  const FzEnter({
-    super.key,
-    required this.child,
-    this.rise = false,
-    this.delay = Duration.zero,
-  });
-
-  final Widget child;
-  final bool rise;
-  final Duration delay;
-
-  static const _travel = Duration(milliseconds: 240);
-
-  @override
-  Widget build(BuildContext context) {
-    if (reduceMotion(context)) return child;
-
-    final total = delay + _travel;
-    final start = delay.inMicroseconds / total.inMicroseconds;
-
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: total,
-      curve: Interval(start, 1, curve: Curves.easeOut),
-      builder: (context, t, child) => Opacity(
-        opacity: t,
-        child: rise
-            ? Transform.translate(offset: Offset(0, 10 * (1 - t)), child: child)
-            : Transform.scale(scale: .92 + .08 * t, child: child),
-      ),
-      child: child,
     );
   }
 }

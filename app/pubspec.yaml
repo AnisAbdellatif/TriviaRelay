@@ -30,6 +30,9 @@ dev_dependencies:
   riverpod_generator: ^4.0.9
   freezed: ^4.0.1
   json_serializable: ^6.14.1
+  # Already in the tree through phoenix_socket; the connection's tests stand in
+  # for the relay's socket with it.
+  web_socket_channel: ^3.0.3
 
 flutter:
   uses-material-design: true

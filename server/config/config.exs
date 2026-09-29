@@ -24,7 +24,20 @@ config :trivia_relay, TriviaRelayWeb.Endpoint,
   pubsub_server: TriviaRelay.PubSub,
   # Each compressed socket keeps its own deflate state; memory level 4 keeps it small
   # (FazouraParty's measurement, see its decisions.md "Connection Memory").
-  http: [websocket_options: [deflate_options: [mem_level: 4]]]
+  #
+  # A message from a phone arriving in fragments is capped as a single frame is
+  # (16 KB, endpoint.ex); Bandit's default is 8 MB. A compressed one may inflate to at most twice its compressed size
+  # past the first 16 KB zlib hands back at once (Bandit checks between those chunks),
+  # so with frames capped at 16 KB (endpoint.ex) nothing inflates past a few tens of
+  # KB. Bandit's default, 25, let a 16 KB frame become 400 KB of JSON to decode. Real
+  # intents inflate to well under 16 KB, so they are never refused.
+  http: [
+    websocket_options: [
+      deflate_options: [mem_level: 4],
+      max_fragmented_message_size: 16_384,
+      max_inflate_ratio: 2
+    ]
+  ]
 
 # Configure Elixir's Logger
 config :logger, :default_formatter,

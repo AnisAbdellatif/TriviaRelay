@@ -203,11 +203,13 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                       onSubmitted: _onQuery,
                     ),
                   ),
-                  SizedBox(
-                    height: 40,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 22),
+                  // As tall as its chips, which grow with the text: a fixed
+                  // row clipped them at large sizes, and cut their targets
+                  // under 48px.
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    child: Row(
                       children: [
                         for (final list in PackList.values)
                           Padding(

@@ -7,8 +7,18 @@ defmodule TriviaRelayWeb.PackController do
 
   use TriviaRelayWeb, :controller
 
+  alias TriviaRelay.Cache
   alias TriviaRelay.Sporcle.{Api, Cred}
   alias TriviaRelayWeb.{ApiError, SporcleErrors}
+
+  # The lists that are the same for everybody, browsed without a search: kept a minute
+  # (TriviaRelay.Cache), since every host opens on them. Anything searched, or a list of
+  # the player's own (bookmarked, created, …), is asked of Sporcle every time.
+  @shared_lists ~w(popular fresh)
+  @shared_ttl_ms 60_000
+
+  def index(conn, %{"q" => q}) when not is_binary(q),
+    do: ApiError.send(conn, :bad_request, "invalid_request", "Search for some text.")
 
   def index(conn, params) do
     page = parse_page(params["page"])
@@ -16,15 +26,27 @@ defmodule TriviaRelayWeb.PackController do
     with {:ok, cred} <- Cred.new(player(conn)),
          {:ok, list} <- list(params["list"]),
          query = String.slice(params["q"] || "", 0, 100),
-         {:ok, packs} <- Api.search_packs(cred, query, page, list) do
+         {:ok, packs} <- search(cred, query, page, list) do
       # An empty page is the end of the list.
-      json(conn, %{packs: Enum.map(packs, &pack/1), next_page: if(packs != [], do: page + 1)})
+      json(conn, %{packs: packs, next_page: if(packs != [], do: page + 1)})
     else
       :invalid_list ->
         ApiError.send(conn, :bad_request, "invalid_list", "That list of packs doesn't exist.")
 
       error ->
         SporcleErrors.send(conn, error)
+    end
+  end
+
+  defp search(cred, "", page, list) when list in @shared_lists do
+    Cache.fetch({:packs, list, page}, @shared_ttl_ms, fn -> search_now(cred, "", page, list) end)
+  end
+
+  defp search(cred, query, page, list), do: search_now(cred, query, page, list)
+
+  defp search_now(cred, query, page, list) do
+    with {:ok, packs} <- Api.search_packs(cred, query, page, list) do
+      {:ok, Enum.map(packs, &pack/1)}
     end
   end
 

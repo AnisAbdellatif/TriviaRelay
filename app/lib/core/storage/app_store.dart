@@ -8,6 +8,9 @@ import '../models/models.dart';
 /// What the app keeps on the device: the signed-in account's Party
 /// credentials, this install's device id, and the seat it was last in, so an
 /// app that was closed mid-game can go back to it. Never a password.
+///
+/// On Android none of it is in a backup or a transfer to a new phone
+/// (android/app/src/main/AndroidManifest.xml).
 class AppStore {
   static const _accountKey = 'trivia_relay.account';
   static const _deviceKey = 'trivia_relay.device_id';
@@ -42,17 +45,26 @@ class AppStore {
     return id;
   }
 
-  Future<SeatTicket?> seat() async {
+  /// The seat [playerId] was last in, or null. A seat is kept with the player
+  /// it belongs to and only ever handed back to that player: whoever signs in
+  /// on this phone next never gets somebody else's.
+  Future<SeatTicket?> seat(String? playerId) async {
+    if (playerId == null) return null;
     final prefs = await SharedPreferences.getInstance();
-    return _decode(prefs.getString(_seatKey), SeatTicket.fromJson);
+    final kept = _decode(prefs.getString(_seatKey), _KeptSeat.fromJson);
+    return kept?.playerId == playerId ? kept?.ticket : null;
   }
 
-  Future<void> saveSeat(SeatTicket? seat) async {
+  /// Keeps [seat] as [playerId]'s, or forgets the seat (either being null).
+  Future<void> saveSeat(SeatTicket? seat, {String? playerId}) async {
     final prefs = await SharedPreferences.getInstance();
-    if (seat == null) {
+    if (seat == null || playerId == null) {
       await prefs.remove(_seatKey);
     } else {
-      await prefs.setString(_seatKey, jsonEncode(seat.toJson()));
+      await prefs.setString(
+        _seatKey,
+        jsonEncode(_KeptSeat(playerId, seat).toJson()),
+      );
     }
   }
 
@@ -64,4 +76,23 @@ class AppStore {
       return null;
     }
   }
+}
+
+/// A seat and whose it is, as stored. A seat stored before it had an owner
+/// reads as nothing.
+class _KeptSeat {
+  const _KeptSeat(this.playerId, this.ticket);
+
+  factory _KeptSeat.fromJson(Map<String, dynamic> json) => _KeptSeat(
+    json['player_id'] as String,
+    SeatTicket.fromJson(json['ticket'] as Map<String, dynamic>),
+  );
+
+  final String playerId;
+  final SeatTicket ticket;
+
+  Map<String, dynamic> toJson() => {
+    'player_id': playerId,
+    'ticket': ticket.toJson(),
+  };
 }

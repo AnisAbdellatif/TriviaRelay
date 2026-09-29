@@ -29,7 +29,8 @@ abstract class SporcleAccount with _$SporcleAccount {
     'handle': handle,
   };
 
-  /// The same, as the headers `GET /api/packs` takes (never the URL).
+  /// The same, as the headers `GET /api/packs` and `GET /api/games` take
+  /// (never the URL).
   Map<String, String> get headers => {
     'x-player-id': playerId,
     'x-player-token': token,

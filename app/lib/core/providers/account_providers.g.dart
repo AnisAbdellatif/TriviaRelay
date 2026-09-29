@@ -119,7 +119,7 @@ final class AccountProvider
   Account create() => Account();
 }
 
-String _$accountHash() => r'e991148dd4ea5d532b01e223711b0a64089fb98d';
+String _$accountHash() => r'caacc9bc88e9213ae00b083f8843c55683dba608';
 
 /// The signed-in Sporcle account, or null.
 

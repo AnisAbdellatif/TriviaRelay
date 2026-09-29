@@ -62,17 +62,51 @@ defmodule TriviaRelayWeb.Plugs.WebApp do
     )
   end
 
-  # No other site may frame the app: a host's controls under somebody else's page are
-  # a click away from moving a game on. A full CSP is left out on
-  # purpose — Flutter's renderer needs `wasm-unsafe-eval` and inline bootstrap, and a
-  # policy loose enough for that buys little — but framing is the one it can refuse.
+  # What the page may load, and that no other site may frame it: a host's controls under
+  # somebody else's page are a click away from moving a game on.
+  #
+  # The Flutter app needs, beyond its own files (index.html loads flutter_bootstrap.js
+  # from a file; there is no inline script):
+  #   * `wasm-unsafe-eval`, to compile CanvasKit's WebAssembly (served locally,
+  #     `--no-web-resources-cdn`);
+  #   * inline styles: the engine writes its own <style> elements;
+  #   * images from anywhere over https: pack and question pictures are <img> elements
+  #     straight from Sporcle's hosts, and decoded ones become blob:/data: URLs;
+  #   * fonts.gstatic.com, where the engine fetches Noto fallback fonts for glyphs the
+  #     bundled fonts don't have (emoji, other scripts);
+  #   * its relay: this origin, over https and over its socket (wss:, or ws: in
+  #     development), named outright because older browsers don't count a socket as
+  #     'self'.
   defp protect(conn) do
     Plug.Conn.merge_resp_headers(conn, [
-      {"content-security-policy", "frame-ancestors 'none'"},
+      {"content-security-policy", csp()},
       {"x-frame-options", "DENY"},
       {"x-content-type-options", "nosniff"},
       {"referrer-policy", "no-referrer"}
     ])
+  end
+
+  @doc "The page's Content-Security-Policy."
+  def csp do
+    socket = TriviaRelayWeb.Endpoint.url() |> String.replace(~r/^http/, "ws")
+
+    Enum.join(
+      [
+        "default-src 'self'",
+        "script-src 'self' 'wasm-unsafe-eval'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' https: data: blob:",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "connect-src 'self' #{socket} https://fonts.gstatic.com",
+        "worker-src 'self' blob:",
+        "manifest-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'none'",
+        "frame-ancestors 'none'"
+      ],
+      "; "
+    )
   end
 
   # The app is a single page: "/" is the shell.

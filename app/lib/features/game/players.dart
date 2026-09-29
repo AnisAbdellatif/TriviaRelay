@@ -17,6 +17,8 @@ class PlayerRow extends StatelessWidget {
     this.trailing,
     this.onTap,
     this.highlight,
+    this.guess,
+    this.merge = false,
   });
 
   final PlayerView player;
@@ -24,6 +26,14 @@ class PlayerRow extends StatelessWidget {
   final String? note;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// What they answered, as they wrote it: its own line, at reading size, in
+  /// its own direction. An empty guess shows as a dash.
+  final String? guess;
+
+  /// Read out as one thing with its [trailing] control (a guess and the
+  /// switch that marks it): one stop for a screen reader, not two.
+  final bool merge;
 
   /// A faint wash behind the row, a little wider than it (a guess the host
   /// re-marked).
@@ -38,44 +48,57 @@ class PlayerRow extends StatelessWidget {
       if (!player.connected) 'away',
       ?note,
     ];
-    final row = InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        child: Row(
-          children: [
-            Opacity(
-              opacity: player.connected ? 1 : .45,
-              child: FzAvatar(
-                id: '${player.peerId}',
-                name: player.name,
-                size: 38,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FzDirection(
-                    text: player.name,
-                    child: Text(
-                      player.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: fz.h(16, weight: FontWeight.w700),
+    final guess = this.guess;
+    Widget row = Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          FzAvatar(
+            id: '${player.peerId}',
+            name: player.name,
+            size: 38,
+            away: !player.connected,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FzDirection(
+                  text: player.name,
+                  child: Text(
+                    player.name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: fz.h(16, weight: FontWeight.w700),
+                  ),
+                ),
+                if (guess != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 1, bottom: 1),
+                    child: FzDirection(
+                      text: guess,
+                      child: SizedBox(
+                        width: double.infinity,
+                        child: Text(
+                          guess.trim().isEmpty ? '—' : guess.trim(),
+                          style: fz.h(15, weight: FontWeight.w500, height: 1.3),
+                        ),
+                      ),
                     ),
                   ),
-                  if (notes.isNotEmpty) FzTag(notes.join(' · ')),
-                ],
-              ),
+                if (notes.isNotEmpty) FzTag(notes.join(' · ')),
+              ],
             ),
-            ?trailing,
-          ],
-        ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 8), trailing!],
+        ],
       ),
     );
+    if (onTap != null) {
+      row = FzTile(onTap: onTap, radius: 14, child: row);
+    }
+    if (merge) row = MergeSemantics(child: row);
     final highlight = this.highlight;
     if (highlight == null) return row;
     return Stack(
@@ -112,8 +135,8 @@ class Standings extends StatelessWidget {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final standings = state.standings;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
+    // Overtaking somebody slides the rows to their new places.
+    return FzReorder(
       children: [
         for (final (rank, player) in standings.indexed)
           PlayerRow(

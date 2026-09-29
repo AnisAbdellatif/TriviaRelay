@@ -23,6 +23,8 @@ defmodule TriviaRelay.FakeUpstream do
     :ok
   end
 
+  def cast_event(pid, event, payload \\ :none), do: send_event(pid, event, payload)
+
   def close(pid), do: send(pid, :close)
 
   defp loop(test) do

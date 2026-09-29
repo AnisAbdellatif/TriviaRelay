@@ -43,8 +43,34 @@ abstract class SeatConnection {
   Future<void> dispose();
 }
 
-enum ConnectionStatus { connecting, connected, reconnecting, disconnected }
+enum ConnectionStatus {
+  connecting,
+  connected,
+  reconnecting,
+  disconnected,
+
+  /// The relay closed this app's channel while the seat goes on: more apps
+  /// joined the seat than it takes, and this one had joined first
+  /// (protocol/PROTOCOL.md §3.3). Final for this connection, and not retried,
+  /// or two phones would take the seat from each other forever.
+  displaced,
+}
 
 /// Why a seat ended (protocol/PROTOCOL.md §5.2), plus [notFound] for a seat
 /// that was already gone when the app came back to it.
-enum SeatClosedReason { left, expired, removed, shutdown, notFound }
+enum SeatClosedReason {
+  left,
+  expired,
+
+  /// The host removed the player, who may join the game again.
+  removed,
+
+  /// The host removed the player for good: Sporcle won't let them back in.
+  kicked,
+
+  /// The player took another seat, on this app or another (`left` with
+  /// `replaced`, since 1.2).
+  moved,
+  shutdown,
+  notFound,
+}

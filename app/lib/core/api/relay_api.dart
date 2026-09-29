@@ -66,6 +66,17 @@ class RelayApi {
     );
   }
 
+  /// The games the player could join (§3.4): invited, friends', then public.
+  Future<List<JoinableGame>> joinableGames(SporcleAccount account) async {
+    final body = await _send(
+      _client.get(_uri('/api/games'), headers: account.headers),
+    );
+    return [
+      for (final game in body['games'] as List<dynamic>)
+        JoinableGame.fromJson(game as Map<String, dynamic>),
+    ];
+  }
+
   /// Joins the Sporcle game [code] (§3.3).
   Future<SeatTicket> join(SporcleAccount account, String code) async {
     final body = await _send(

@@ -6,18 +6,26 @@ defmodule TriviaRelay.Seats do
   used for that call and not kept, then starts a `Seat` holding the player's GameLift
   connection. The phone gets back the seat's id and a signed seat token, joins
   `seat:<id>` with it, and presents the same token every time it reconnects.
+
+  The relay holds at most `:max_seats` seats (default 2000); past that, taking a seat
+  is refused with `{:error, :seats_full}` before anything is asked of Sporcle.
   """
 
   alias TriviaRelay.Seats.{Intents, Seat}
   alias TriviaRelay.Sporcle.{Api, Cred, Identity}
 
   @token_salt "seat"
-  # A seat never outlives a day; its token need not either.
+  # A seat never outlives a day (`Seat`'s `:seat_max_ms`); its token need not either.
   @token_max_age 86_400
+  @default_max_seats 2000
+
+  @doc "How many seats the relay holds at most (`config :trivia_relay, :max_seats`)."
+  def max_seats, do: Application.get_env(:trivia_relay, :max_seats, @default_max_seats)
 
   @doc "Joins the game `code`. Returns `{:ok, seat}` with `:id`, `:token` and `:game_code`."
   def join(%Cred{} = cred, code, opts \\ []) do
-    with {:ok, joined} <- Api.join_game(cred, code),
+    with :ok <- room(),
+         {:ok, joined} <- Api.join_game(cred, code),
          {:ok, session} <- session(joined) do
       start(cred, code, session, Identity.player(cred, false), opts)
     end
@@ -30,6 +38,7 @@ defmodule TriviaRelay.Seats do
   """
   def host(%Cred{} = cred, pack_id, options, opts \\ []) do
     with {:ok, game_options} <- Intents.validate_options(options),
+         :ok <- room(),
          {:ok, pack} <- Api.get_pack(cred, pack_id),
          {:ok, pack} <- found(pack),
          {:ok, game} <- Api.create_game(cred, pack, game_options),
@@ -91,8 +100,16 @@ defmodule TriviaRelay.Seats do
 
     case DynamicSupervisor.start_child(TriviaRelay.Seats.Supervisor, spec) do
       {:ok, _pid} -> {:ok, %{id: id, token: sign(id), game_code: code}}
+      {:error, :max_children} -> {:error, :seats_full}
       {:error, reason} -> {:error, {:seat_failed, reason}}
     end
+  end
+
+  # Checked before the Sporcle call, so a full relay does not have Sporcle seat a player
+  # it cannot hold; the supervisor's `max_children` is what actually holds the line.
+  defp room do
+    %{active: active} = DynamicSupervisor.count_children(TriviaRelay.Seats.Supervisor)
+    if active < max_seats(), do: :ok, else: {:error, :seats_full}
   end
 
   # createGame and joinGame answer 200 even when they refuse; what they refuse with has

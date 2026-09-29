@@ -15,11 +15,22 @@ defmodule TriviaRelay.Sporcle.Upstream do
 
   `label` names the connection in the log and to the owner, since a rejoin opens
   another one.
+
+  What arrives is bounded: a message (compressed on the wire, inflated, or reassembled
+  from Sporcle's length-prefixed envelopes) larger than `max_message_bytes/0` closes the
+  connection (`{:closed, {:too_large, _}}`), which the seat reports as `lost`. Sporcle's
+  real messages are a few kilobytes. Crash reports and `:sys.get_status/1` show a
+  summary, never the login (device id) or the PlayerSessionId.
   """
 
   use GenServer
 
   alias TriviaRelay.Sporcle.{Envelope, FrameLog, Identity}
+
+  @max_message_bytes 1_048_576
+
+  @doc "The largest message the connection takes, in bytes."
+  def max_message_bytes, do: @max_message_bytes
 
   @doc """
   Options: `:owner`, `:label`, `:session` (the `playerSession` map from createGame or
@@ -29,8 +40,15 @@ defmodule TriviaRelay.Sporcle.Upstream do
   """
   def start_link(opts), do: GenServer.start_link(__MODULE__, Map.new(opts))
 
-  @doc "Sends `[event, payload]` (`[event]` when payload is `:none`)."
+  @doc "Sends `[event, payload]` (`[event]` when payload is `:none`), and says how it went."
   def send_event(pid, event, payload \\ :none), do: GenServer.call(pid, {:send, event, payload})
+
+  @doc """
+  Sends `[event, payload]` without waiting: what the relay's seats use, so a stalled
+  socket never holds a seat up. A send that fails ends the connection, as a failed pong
+  would.
+  """
+  def cast_event(pid, event, payload \\ :none), do: GenServer.cast(pid, {:send, event, payload})
 
   @doc "Cuts the TCP connection with no WebSocket close: what a phone losing signal looks like."
   def drop(pid), do: GenServer.cast(pid, :drop)
@@ -43,7 +61,16 @@ defmodule TriviaRelay.Sporcle.Upstream do
     state =
       %{log: nil}
       |> Map.merge(opts)
-      |> Map.merge(%{conn: nil, ref: nil, ws: nil, status: nil, headers: [], buffer: <<>>})
+      |> Map.merge(%{
+        conn: nil,
+        ref: nil,
+        ws: nil,
+        status: nil,
+        headers: [],
+        buffer: <<>>,
+        # Bytes received towards a WebSocket message not yet complete.
+        pending: 0
+      })
 
     {:ok, state, {:continue, :connect}}
   end
@@ -56,7 +83,7 @@ defmodule TriviaRelay.Sporcle.Upstream do
     with {:ok, conn} <- Mint.HTTP.connect(:https, host, port, protocols: [:http1]),
          {:ok, conn, ref} <-
            Mint.WebSocket.upgrade(:wss, conn, "/", [{"user-agent", Identity.user_agent_ws()}],
-             extensions: [Mint.WebSocket.PerMessageDeflate]
+             extensions: [__MODULE__.Deflate]
            ) do
       {:noreply, %{s | conn: conn, ref: ref}}
     else
@@ -70,16 +97,22 @@ defmodule TriviaRelay.Sporcle.Upstream do
     do: {:reply, {:error, :not_connected}, s}
 
   def handle_call({:send, event, payload}, _from, s) do
-    frame = if payload == :none, do: Envelope.game(event), else: Envelope.game(event, payload)
-    log_out(s, %{kind: "game", event: event, payload: nilify(payload)}, frame)
-
-    case send_frame(s, {:binary, frame}) do
+    case send_game(s, event, payload) do
       {:ok, s} -> {:reply, :ok, s}
       {:error, s, reason} -> {:reply, {:error, reason}, s}
     end
   end
 
   @impl true
+  def handle_cast({:send, _event, _payload}, %{ws: nil} = s), do: {:noreply, s}
+
+  def handle_cast({:send, event, payload}, s) do
+    case send_game(s, event, payload) do
+      {:ok, s} -> {:noreply, s}
+      {:error, s, reason} -> finish(s, {:send_failed, reason})
+    end
+  end
+
   def handle_cast(:drop, s) do
     ctl(s, "drop", %{})
     if s.conn, do: Mint.HTTP.close(s.conn)
@@ -129,10 +162,21 @@ defmodule TriviaRelay.Sporcle.Upstream do
     end
   end
 
+  # Mint keeps an incomplete WebSocket message to itself, so what it holds is counted
+  # here: the bytes received since a data message last came out whole.
   defp handle_response({:data, _ref, data}, s) do
+    pending = s.pending + byte_size(data)
+
     case Mint.WebSocket.decode(s.ws, data) do
-      {:ok, ws, frames} -> handle_frames(frames, %{s | ws: ws})
-      {:error, ws, reason} -> {:stop, {:bad_frame, reason}, %{s | ws: ws}}
+      {:ok, ws, frames} ->
+        pending = if Enum.any?(frames, &data_frame?/1), do: 0, else: pending
+
+        if pending > @max_message_bytes,
+          do: {:stop, {:too_large, :websocket}, %{s | ws: ws}},
+          else: handle_frames(frames, %{s | ws: ws, pending: pending})
+
+      {:error, ws, reason} ->
+        {:stop, {:bad_frame, reason}, %{s | ws: ws}}
     end
   end
 
@@ -163,10 +207,15 @@ defmodule TriviaRelay.Sporcle.Upstream do
   end
 
   defp handle_frame({:binary, data}, s) do
-    {bodies, buffer} = Envelope.split(s.buffer <> data)
-    Enum.each(bodies, &inbound(s, &1))
-    if buffer != <<>>, do: ctl(s, "partial", %{bytes: byte_size(buffer)})
-    {:ok, %{s | buffer: buffer}}
+    case Envelope.split(s.buffer <> data, @max_message_bytes) do
+      {bodies, buffer} when byte_size(buffer) <= @max_message_bytes ->
+        Enum.each(bodies, &inbound(s, &1))
+        if buffer != <<>>, do: ctl(s, "partial", %{bytes: byte_size(buffer)})
+        {:ok, %{s | buffer: buffer}}
+
+      _too_large ->
+        {:stop, {:too_large, :envelope}, %{s | buffer: <<>>}}
+    end
   end
 
   defp handle_frame({:text, text}, s) do
@@ -176,7 +225,7 @@ defmodule TriviaRelay.Sporcle.Upstream do
   end
 
   defp handle_frame({:ping, data}, s) do
-    ctl(s, "ping", %{hex: Base.encode16(data, case: :lower)})
+    if s.log, do: ctl(s, "ping", %{hex: Base.encode16(data, case: :lower)})
 
     case send_frame(s, {:pong, data}) do
       {:ok, s} -> {:ok, s}
@@ -185,12 +234,21 @@ defmodule TriviaRelay.Sporcle.Upstream do
   end
 
   defp handle_frame({:pong, data}, s) do
-    ctl(s, "pong", %{hex: Base.encode16(data, case: :lower)})
+    if s.log, do: ctl(s, "pong", %{hex: Base.encode16(data, case: :lower)})
     {:ok, s}
   end
 
   defp handle_frame({:close, code, reason}, s), do: {:stop, {:server_closed, code, reason}, s}
   defp handle_frame({:error, reason}, s), do: {:stop, {:bad_frame, reason}, s}
+
+  # The relay keeps no log: the hex and the envelope fields are only worked out for one.
+  defp inbound(%{log: nil} = s, body) do
+    case Envelope.decode(body) do
+      {:ok, %{event: nil, fields: fields}} -> notify(s, {:frame, fields})
+      {:ok, %{event: event, payload: payload}} -> notify(s, {:event, event, payload})
+      :error -> :ok
+    end
+  end
 
   defp inbound(s, body) do
     hex = Base.encode16(body, case: :lower)
@@ -221,6 +279,15 @@ defmodule TriviaRelay.Sporcle.Upstream do
     end
   end
 
+  defp send_game(s, event, payload) do
+    frame = if payload == :none, do: Envelope.game(event), else: Envelope.game(event, payload)
+    log_out(s, %{kind: "game", event: event, payload: nilify(payload)}, frame)
+    send_frame(s, {:binary, frame})
+  end
+
+  defp data_frame?({kind, _data}), do: kind in [:binary, :text]
+  defp data_frame?(_frame), do: false
+
   defp send_frame(s, frame) do
     with {:ok, ws, data} <- Mint.WebSocket.encode(s.ws, frame),
          {:ok, conn} <- Mint.WebSocket.stream_request_body(s.conn, s.ref, data) do
@@ -235,6 +302,8 @@ defmodule TriviaRelay.Sporcle.Upstream do
     notify(s, {:closed, reason})
     {:stop, :normal, s}
   end
+
+  defp log_out(%{log: nil}, _entry, _frame), do: :ok
 
   defp log_out(s, entry, frame) do
     FrameLog.write(
@@ -252,4 +321,126 @@ defmodule TriviaRelay.Sporcle.Upstream do
 
   defp nilify(:none), do: nil
   defp nilify(payload), do: payload
+
+  # The login carries the device id and the session its PlayerSessionId, and frames carry
+  # other players' names and answers: none of them belong in a crash report.
+  @impl true
+  def format_status(status) do
+    Map.new(status, fn
+      {:state, %{label: _} = s} ->
+        {:state,
+         %{
+           label: s.label,
+           upgraded: s.ws != nil,
+           status: s.status,
+           buffered: byte_size(s.buffer),
+           pending: s.pending
+         }}
+
+      {:state, _} ->
+        {:state, :redacted}
+
+      {:message, message} ->
+        {:message, tag(message)}
+
+      {:queue, queue} when is_list(queue) ->
+        {:queue, Enum.map(queue, &tag/1)}
+
+      {:log, _} ->
+        {:log, []}
+
+      {:reason, reason} ->
+        {:reason, reason(reason)}
+
+      other ->
+        other
+    end)
+  end
+
+  defp tag({:"$gen_call", _from, request}), do: {:"$gen_call", tag(request)}
+  defp tag({:"$gen_cast", request}), do: {:"$gen_cast", tag(request)}
+  defp tag({:send, event, _payload}), do: {:send, event}
+  defp tag(message) when is_tuple(message) and tuple_size(message) > 0, do: elem(message, 0)
+  defp tag(message) when is_atom(message), do: message
+  defp tag(_message), do: :redacted
+
+  defp reason({%{__exception__: true} = error, stack}) when is_list(stack),
+    do: {error.__struct__, Enum.map(stack, &frame/1)}
+
+  defp reason({kind, stack}) when is_atom(kind) and is_list(stack),
+    do: {kind, Enum.map(stack, &frame/1)}
+
+  defp reason(reason) when is_atom(reason), do: reason
+  defp reason(reason), do: tag(reason)
+
+  defp frame({m, f, args, location}) when is_list(args), do: {m, f, length(args), location}
+  defp frame(frame), do: frame
+end
+
+defmodule TriviaRelay.Sporcle.Upstream.Deflate do
+  @moduledoc false
+  # permessage-deflate as `Mint.WebSocket.PerMessageDeflate` does it, except that a
+  # message inflating past `Upstream.max_message_bytes/0` is an error rather than all of
+  # memory: a few kilobytes of compressed JSON can say gigabytes.
+
+  @behaviour Mint.WebSocket.Extension
+
+  require Mint.WebSocket.Frame, as: Frame
+
+  alias Mint.WebSocket.PerMessageDeflate
+  alias TriviaRelay.Sporcle.Upstream
+
+  @impl true
+  def name, do: PerMessageDeflate.name()
+
+  @impl true
+  def init(extension, extensions), do: PerMessageDeflate.init(extension, extensions)
+
+  @impl true
+  def encode(frame, state), do: PerMessageDeflate.encode(frame, state)
+
+  @impl true
+  def decode(frame, state)
+
+  for opcode <- [:text, :binary, :continuation] do
+    def decode(
+          Frame.unquote(opcode)(reserved: <<1::size(1), _::bitstring>> = bits, data: data) =
+            frame,
+          state
+        ) do
+      <<reserved::size(3)>> = bits
+
+      with {:ok, data} <- inflate(state.inflate, <<data::binary, 0x00, 0x00, 0xFF, 0xFF>>) do
+        if state.inflate_takeover? == false, do: :zlib.inflateReset(state.inflate)
+
+        frame =
+          Frame.unquote(opcode)(frame,
+            reserved: <<:erlang.bxor(reserved, 0b100)::size(3)>>,
+            data: data
+          )
+
+        {:ok, frame, state}
+      end
+    end
+  end
+
+  def decode(frame, state), do: {:ok, frame, state}
+
+  defp inflate(z, data) do
+    collect(z, :zlib.safeInflate(z, data), [], 0)
+  rescue
+    ErlangError -> {:error, :bad_deflate}
+  end
+
+  defp collect(z, {status, out}, acc, size) when status in [:continue, :finished] do
+    size = size + IO.iodata_length(out)
+
+    cond do
+      size > Upstream.max_message_bytes() -> {:error, {:too_large, :inflated}}
+      status == :finished -> {:ok, IO.iodata_to_binary([acc, out])}
+      true -> collect(z, :zlib.safeInflate(z, []), [acc, out], size)
+    end
+  end
+
+  defp collect(_z, _other, _acc, _size), do: {:error, :bad_deflate}
 end

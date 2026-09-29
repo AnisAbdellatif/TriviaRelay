@@ -6,7 +6,7 @@ defmodule TriviaRelayWeb.SeatControllerTest do
   @player %{
     "player_id" => "joinPlayer",
     "token" => "t0k3n",
-    "device_id" => "d3v",
+    "device_id" => "0123456789abcdef",
     "handle" => "Joiner"
   }
 

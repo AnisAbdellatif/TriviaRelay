@@ -7,6 +7,9 @@ defmodule TriviaRelayWeb.SeatChannel do
   through and pushes what the seat sends. Snapshots arrive as `state`, the end as
   `seat_closed`. After each snapshot the channel hibernates, which returns the garbage
   encoding it left behind (FazouraParty measured this; see its decisions.md).
+
+  Intents are metered per socket and per seat, so neither another socket nor another
+  phone on the same seat adds to what a seat can send Sporcle.
   """
 
   # Join parameters are seat tokens: never logged.
@@ -14,11 +17,13 @@ defmodule TriviaRelayWeb.SeatChannel do
 
   alias TriviaRelay.{Protocol, RateLimit, Seats}
   alias TriviaRelay.Seats.Seat
+  alias TriviaRelayWeb.ClientIp
 
   # Failed joins are how somebody would test seat tokens; working ones are never counted,
   # so a phone reconnecting after a blip is untouched.
   @failed_join_limit 30
   @failed_join_window_ms 60_000
+  # Per socket, and again per seat across all its phones.
   @event_limit 60
   @event_window_ms 10_000
 
@@ -48,7 +53,7 @@ defmodule TriviaRelayWeb.SeatChannel do
          {:ok, pid} <- seat(id, params["seat_token"], ip),
          :ok <- Seat.attach(pid, self()) do
       Process.monitor(pid)
-      {:ok, assign(socket, :seat, pid)}
+      {:ok, socket |> assign(:seat, pid) |> assign(:seat_id, id)}
     else
       {:error, code} -> {:error, error(code)}
     end
@@ -70,10 +75,14 @@ defmodule TriviaRelayWeb.SeatChannel do
     {:noreply, socket, :hibernate}
   end
 
-  def handle_info({:seat_closed, reason}, socket) do
-    push(socket, "seat_closed", %{reason: reason})
+  def handle_info({:seat_closed, closed}, socket) do
+    push(socket, "seat_closed", closed)
     {:stop, :normal, socket}
   end
+
+  # More phones attached to the seat than it takes, and this was the oldest. Closed
+  # without a word, so the phone does not rejoin and push the newer one out in turn.
+  def handle_info(:seat_detached, socket), do: {:stop, :normal, socket}
 
   def handle_info({:DOWN, _ref, :process, pid, _reason}, %{assigns: %{seat: pid}} = socket) do
     push(socket, "seat_closed", %{reason: "shutdown"})
@@ -94,16 +103,24 @@ defmodule TriviaRelayWeb.SeatChannel do
       end
 
     with {:error, _} <- result do
-      RateLimit.check(:failed_joins, ip, @failed_join_limit, @failed_join_window_ms)
+      RateLimit.check_all(
+        :failed_joins,
+        ClientIp.limits(ip, @failed_join_limit),
+        @failed_join_window_ms
+      )
     end
 
     result
   end
 
   defp joins_left(ip) do
-    if RateLimit.exceeded?(:failed_joins, ip, @failed_join_limit, @failed_join_window_ms),
-      do: {:error, "rate_limited"},
-      else: :ok
+    if RateLimit.any_exceeded?(
+         :failed_joins,
+         ClientIp.limits(ip, @failed_join_limit),
+         @failed_join_window_ms
+       ),
+       do: {:error, "rate_limited"},
+       else: :ok
   end
 
   defp version(major) do
@@ -111,12 +128,12 @@ defmodule TriviaRelayWeb.SeatChannel do
   end
 
   defp metered(socket) do
-    case RateLimit.check(
-           :seat_events,
-           inspect(socket.transport_pid),
-           @event_limit,
-           @event_window_ms
-         ) do
+    with :ok <- meter(:seat_events, inspect(socket.transport_pid)),
+         do: meter(:seat_intents, socket.assigns.seat_id)
+  end
+
+  defp meter(bucket, key) do
+    case RateLimit.check(bucket, key, @event_limit, @event_window_ms) do
       :ok -> :ok
       {:error, :rate_limited} -> {:error, "rate_limited"}
     end

@@ -64,6 +64,14 @@ defmodule TriviaRelay.Sporcle.EnvelopeTest do
     assert byte_size(rest) > 0
   end
 
+  test "split refuses a message longer than the limit as soon as its length says so" do
+    big = Envelope.game("a", String.duplicate("x", 2_000))
+    assert {[_], ""} = Envelope.split(big, 4_000)
+    assert {:error, :too_large} = Envelope.split(big, 1_000)
+    # Only the length has arrived: nothing to wait for.
+    assert {:error, :too_large} = Envelope.split(binary_part(big, 0, 3), 1_000)
+  end
+
   test "undecodable bytes are an error, not a crash" do
     assert Envelope.decode(<<0xFF>>) == :error
   end

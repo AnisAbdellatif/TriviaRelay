@@ -24,13 +24,33 @@ defmodule TriviaRelay.Seats.State do
   @vote_ms 15_000
   @wager_ms 30_000
   @final_wagers [0, 10, 20]
+  @final_votes ~w(easy medium hard)
+  @questions_per_game [5, 10, 15, 20]
+  @question_seconds [15, 30, 45, 60]
   # How long after a question's time runs out the host may reveal it without everyone's
   # answer, as in the official app.
   @reveal_grace_ms 5_000
 
+  # Everything here comes from Sporcle, and through it from any player in the game: a
+  # hostile one can send any JSON at all. Events are type-checked part by part, what does
+  # not fit is ignored, and what is kept is bounded, so no event can crash the seat or grow
+  # it without limit. The bounds are far above anything a real game sends.
+  @max_players 100
+  # Question indexes: the regular questions (at most 20) and the final's candidates.
+  @max_index 63
+  @max_name 64
+  @max_text 200
+  @max_long_text 2_000
+  # JSON numbers the app can hold as integers.
+  @max_int 9_007_199_254_740_991
+
+  defguardp int?(n) when is_integer(n) and n >= -@max_int and n <= @max_int
+
   defstruct me: nil,
             peer_id: nil,
             status: :connecting,
+            # Once `removed`: whether Sporcle lets the player join this game again.
+            can_rejoin: true,
             phase: :lobby,
             pack: nil,
             questions_per_game: 10,
@@ -61,7 +81,7 @@ defmodule TriviaRelay.Seats.State do
   @doc "Folds one Sporcle event in. `now` is the relay's clock in milliseconds."
   def apply_event(state, event, payload, now)
 
-  def apply_event(s, "game_info", info, _now) do
+  def apply_event(s, "game_info", %{} = info, _now) do
     s =
       %{s | status: :live}
       |> put_players(info["allPlayers"])
@@ -71,19 +91,19 @@ defmodule TriviaRelay.Seats.State do
     # The game_info that starts a game carries the round plan instead of the players.
     case info do
       %{"allRounds" => rounds} when is_list(rounds) ->
-        %{new_game(s) | rounds: Enum.map(rounds, &plan_entry/1)}
+        %{new_game(s) | rounds: plan(rounds)}
 
       _ ->
         s
     end
   end
 
-  def apply_event(s, "game_connect", info, now) do
+  def apply_event(s, "game_connect", %{} = info, now) do
     s = put_pack(%{s | status: :live}, info["gamePack"])
 
     cond do
       info["inLobby"] == true -> %{s | phase: :lobby, deadline: nil}
-      view = info["currentView"] -> enter_view(s, view, info, now)
+      is_binary(info["currentView"]) -> enter_view(s, info["currentView"], info, now)
       true -> s
     end
   end
@@ -100,14 +120,15 @@ defmodule TriviaRelay.Seats.State do
     update_player(s, s.peer_id, &%{&1 | host: true})
   end
 
-  def apply_event(s, "game_question", %{"questionIndex" => index} = q, now) do
+  def apply_event(s, "game_question", %{"questionIndex" => index} = q, now)
+      when is_integer(index) and index in 0..@max_index do
     if Map.has_key?(q, "question") do
       question = %{
         index: index,
-        text: q["question"],
-        category: q["questionCategory"],
-        difficulty: q["questionDifficulty"],
-        image_url: q["questionImgSrc"] || q["img_src"],
+        text: text(q["question"], @max_long_text) || "",
+        category: text(q["questionCategory"], @max_text),
+        difficulty: difficulty(q["questionDifficulty"]),
+        image_url: text(q["questionImgSrc"] || q["img_src"], @max_long_text),
         final: index >= s.questions_per_game
       }
 
@@ -129,30 +150,21 @@ defmodule TriviaRelay.Seats.State do
     end
   end
 
-  def apply_event(s, "list_answers", %{"questionIndex" => index} = list, _now) do
-    entries =
-      for entry <- list["allPlayerAnswers"] || [], into: %{} do
-        {entry["peerId"],
-         %{
-           text: entry["guessText"],
-           wager: entry["wagerAmount"],
-           correct: entry["correct"] == true,
-           score: entry["score"]
-         }}
-      end
-
-    s = %{s | answers: Map.put(s.answers, index, %{answer: list["answer"], entries: entries})}
-
-    Enum.reduce(entries, s, fn {peer, entry}, s ->
-      update_player(s, peer, &%{&1 | score: entry.score || &1.score})
-    end)
+  def apply_event(s, "list_answers", %{"questionIndex" => index} = list, _now)
+      when is_integer(index) and index in 0..@max_index do
+    case list["allPlayerAnswers"] || [] do
+      answers when is_list(answers) -> put_answers(s, index, list["answer"], answers)
+      _ -> s
+    end
   end
 
-  def apply_event(s, "advance_all", %{"currentView" => view} = payload, now),
-    do: enter_view(s, view, payload, now)
+  def apply_event(s, "advance_all", %{"currentView" => view} = payload, now)
+      when is_binary(view),
+      do: enter_view(s, view, payload, now)
 
-  def apply_event(s, "judgement_update", %{"playerJudgements" => judgements}, _now) do
-    %{s | judgements: Map.new(judgements, fn {peer, ok} -> {to_int(peer), ok == true} end)}
+  def apply_event(s, "judgement_update", %{"playerJudgements" => judgements}, _now)
+      when is_map(judgements) do
+    %{s | judgements: judgements(s, judgements)}
   end
 
   # Settled marks end the final: the official app moves to its final scoreboard by itself,
@@ -162,13 +174,22 @@ defmodule TriviaRelay.Seats.State do
 
   def apply_event(s, "judged_answers", _payload, _now), do: %{s | judged: true}
 
-  def apply_event(s, "vote_final_round", %{"finalVotes" => votes}, _now),
-    do: put_in(s.final.votes, votes)
+  def apply_event(s, "vote_final_round", %{"finalVotes" => votes}, _now) when is_map(votes) do
+    votes = for {choice, n} <- votes, choice in @final_votes, int?(n), into: %{}, do: {choice, n}
+    put_in(s.final.votes, votes)
+  end
 
   # Wagers can arrive with no CAST_WAGER before them: after a restarted final the server
   # skipped the vote it had already settled. Wagers mean the game is wagering.
-  def apply_event(s, "list_final_wagers", %{"allPlayerFinalWagers" => wagers}, _now) do
-    s = put_in(s.final.wagers, Map.new(wagers, &{&1["peerId"], &1["finalWager"]}))
+  def apply_event(s, "list_final_wagers", %{"allPlayerFinalWagers" => wagers}, _now)
+      when is_list(wagers) do
+    wagers =
+      for %{"peerId" => peer, "finalWager" => wager} <- first(wagers, @max_players),
+          int?(peer) and int?(wager),
+          into: %{},
+          do: {peer, wager}
+
+    s = put_in(s.final.wagers, wagers)
     if s.phase == :final_vote, do: %{s | phase: :final_wager}, else: s
   end
 
@@ -179,10 +200,17 @@ defmodule TriviaRelay.Seats.State do
 
   def apply_event(s, "change_pack", %{"gamePack" => pack}, _now), do: put_pack(s, pack)
 
-  def apply_event(s, "bounce", payload, _now) when is_map(payload) do
-    if payload["playerId"] == s.me or (s.peer_id && payload["peerId"] == s.peer_id),
-      do: %{s | status: :removed},
-      else: s
+  # Sporcle sends `bounce` only to the player the host removed, and the official app never
+  # checks whom it names (decompiled). `noReturn` is the host's "Kick" rather than "Eject";
+  # `reject` is a kicked player trying to come back.
+  def apply_event(s, "bounce", payload, _now) do
+    payload = if is_map(payload), do: payload, else: %{}
+
+    %{
+      s
+      | status: :removed,
+        can_rejoin: !(payload["noReturn"] == true or payload["reject"] == true)
+    }
   end
 
   def apply_event(s, _event, _payload, _now), do: s
@@ -202,7 +230,35 @@ defmodule TriviaRelay.Seats.State do
   """
   def ready(s, ready?), do: update_player(s, s.peer_id, &%{&1 | ready: ready?})
 
+  @doc "Whether this seat's own player is marked ready (nil when it isn't known yet)."
+  def ready?(s), do: get_in(s.players, [s.peer_id, :ready])
+
   def draft(s, text, wager), do: %{s | draft: %{text: text, wager: wager}}
+
+  @doc """
+  Takes over what `old`, an earlier seat of the same player in the same game, had spent:
+  its answers (so a question is answered once, and each wager used once) and its final
+  vote and wager. Sporcle gives a rejoining player back their place, but only resends the
+  current question's answers, so a new seat would otherwise start with every wager.
+  """
+  def carry_over(s, %__MODULE__{} = old) do
+    sent =
+      for index <- 0..@max_index,
+          answer = own_answer(old, index),
+          into: s.sent,
+          do: {index, answer}
+
+    %{
+      s
+      | sent: sent,
+        final: %{
+          s.final
+          | vote: s.final.vote || old.final.vote,
+            wager: s.final.wager || final_wager(old)
+        }
+    }
+  end
+
   def voted(s, choice), do: put_in(s.final.vote, choice)
   def wagered(s, amount), do: put_in(s.final.wager, amount)
   def played_again(s), do: %{s | played_again: true}
@@ -224,6 +280,8 @@ defmodule TriviaRelay.Seats.State do
 
   def host?(s), do: match?(%{host: true}, s.players[s.peer_id])
 
+  def player?(s, peer), do: Map.has_key?(s.players, peer)
+
   @doc "The question the game is on: open, or revealed and being judged."
   def index(%{question: %{index: index}}), do: index
   def index(_), do: nil
@@ -232,9 +290,12 @@ defmodule TriviaRelay.Seats.State do
   def own_answer(s, index) do
     case get_in(s.answers, [index, :entries, s.peer_id]) do
       nil -> s.sent[index]
-      entry -> %{text: entry.text, wager: entry.wager}
+      entry -> %{text: entry.text || "", wager: entry.wager || 0}
     end
   end
+
+  @doc "This seat's final wager: placed from here, or seen in `list_final_wagers`."
+  def final_wager(s), do: s.final.wager || s.final.wagers[s.peer_id]
 
   def answered?(s, index), do: own_answer(s, index) != nil
 
@@ -273,6 +334,9 @@ defmodule TriviaRelay.Seats.State do
   end
 
   def final_wagers, do: @final_wagers
+  def final_votes, do: @final_votes
+  def questions_per_game_choices, do: @questions_per_game
+  def question_seconds_choices, do: @question_seconds
 
   @doc """
   What the seat must do by itself at `now`. When a question's time runs out and this seat
@@ -289,7 +353,7 @@ defmodule TriviaRelay.Seats.State do
     end
   end
 
-  defp timeout_wager(%{phase: :final_question} = s), do: s.final.wager || 0
+  defp timeout_wager(%{phase: :final_question} = s), do: final_wager(s) || 0
 
   defp timeout_wager(s) do
     choices = wager_choices(s)
@@ -302,7 +366,8 @@ defmodule TriviaRelay.Seats.State do
   defp enter_view(s, "GameShowAnswer", _payload, _now), do: %{s | phase: :reveal, deadline: nil}
 
   defp enter_view(s, "CAST_WAGER", payload, now) do
-    s = put_in(s.final.picked, payload["pickedVote"] || s.final.picked)
+    picked = payload["pickedVote"]
+    s = if picked in @final_votes, do: put_in(s.final.picked, picked), else: s
     %{s | phase: :final_wager, question: nil, deadline: now + @wager_ms}
   end
 
@@ -325,26 +390,57 @@ defmodule TriviaRelay.Seats.State do
     }
   end
 
+  defp put_answers(s, index, answer, answers) do
+    entries =
+      for %{"peerId" => peer} = entry <- Enum.take(answers, @max_players),
+          int?(peer),
+          into: %{} do
+        {peer,
+         %{
+           text: text(entry["guessText"], @max_text),
+           wager: integer(entry["wagerAmount"]),
+           correct: entry["correct"] == true,
+           score: integer(entry["score"])
+         }}
+      end
+
+    answer = %{answer: text(answer, @max_long_text), entries: entries}
+    s = %{s | answers: Map.put(s.answers, index, answer)}
+
+    Enum.reduce(entries, s, fn {peer, entry}, s ->
+      update_player(s, peer, &%{&1 | score: entry.score || &1.score})
+    end)
+  end
+
   defp put_players(s, players) when is_list(players) do
     Enum.reduce(players, %{s | players: %{}}, &put_player(&2, &1, true))
   end
 
   defp put_players(s, _), do: s
 
-  defp put_player(s, %{"peerId" => peer} = p, connected?) do
-    player = %{
-      peer_id: peer,
-      player_id: p["playerId"],
-      name: p["teamName"] || p["sporcleHandle"],
-      host: p["isHost"] == true,
-      connected: connected?,
-      ready: p["readyForGame"] == true,
-      spectate: p["spectate"] == true,
-      score: p["score"] || get_in(s.players, [peer, :score]) || 0
-    }
+  # Players past `@max_players` are left out, except this seat's own.
+  defp put_player(s, %{"peerId" => peer} = p, connected?) when int?(peer) do
+    me? = p["playerId"] == s.me
 
-    s = %{s | players: Map.put(s.players, peer, player)}
-    if p["playerId"] == s.me, do: %{s | peer_id: peer}, else: s
+    if map_size(s.players) >= @max_players and not Map.has_key?(s.players, peer) and not me? do
+      s
+    else
+      player = %{
+        peer_id: peer,
+        player_id: text(p["playerId"], @max_text),
+        name:
+          text(p["teamName"], @max_name) || text(p["sporcleHandle"], @max_name) ||
+            "Player #{peer}",
+        host: p["isHost"] == true,
+        connected: connected?,
+        ready: p["readyForGame"] == true,
+        spectate: p["spectate"] == true,
+        score: integer(p["score"]) || get_in(s.players, [peer, :score]) || 0
+      }
+
+      s = %{s | players: Map.put(s.players, peer, player)}
+      if me?, do: %{s | peer_id: peer}, else: s
+    end
   end
 
   defp put_player(s, _, _), do: s
@@ -356,37 +452,75 @@ defmodule TriviaRelay.Seats.State do
     end
   end
 
+  # Only the values the game offers (constants.json): anything else would break the
+  # wagers and the clock, so the seat keeps what it had.
   defp put_options(s, %{} = options) do
+    per_game = options["QUESTIONS_PER_GAME"]
+    seconds = options["QUESTION_SECONDS"]
+
     %{
       s
-      | questions_per_game: options["QUESTIONS_PER_GAME"] || s.questions_per_game,
-        question_seconds: options["QUESTION_SECONDS"] || s.question_seconds
+      | questions_per_game:
+          if(per_game in @questions_per_game, do: per_game, else: s.questions_per_game),
+        question_seconds: if(seconds in @question_seconds, do: seconds, else: s.question_seconds)
     }
   end
 
   defp put_options(s, _), do: s
 
+  # A pack the app could not show (no id or name) is ignored.
   defp put_pack(s, %{} = pack) do
-    %{
-      s
-      | pack: %{
-          id: pack["id"],
-          name: pack["name"],
-          description: pack["description"],
-          image_url: if(pack["img_src"] in [nil, ""], do: nil, else: pack["img_src"]),
-          num_questions: pack["num_questions"],
-          has_images: pack["has_images"] == true
-        }
-    }
+    with id when is_integer(id) <- to_int(pack["id"]),
+         name when is_binary(name) <- text(pack["name"], @max_text) do
+      %{
+        s
+        | pack: %{
+            id: id,
+            name: name,
+            description: text(pack["description"], @max_long_text),
+            image_url: if(pack["img_src"] != "", do: text(pack["img_src"], @max_long_text)),
+            num_questions: integer(pack["num_questions"]),
+            has_images: pack["has_images"] == true
+          }
+      }
+    else
+      _ -> s
+    end
   end
 
   defp put_pack(s, _), do: s
 
-  defp plan_entry(r), do: %{index: r["questionIndex"], percent: to_int(r["percent"])}
+  defp plan(rounds) do
+    for %{"questionIndex" => index} = r <- first(rounds, @max_index + 1),
+        int?(index),
+        do: %{index: index, percent: to_int(r["percent"])}
+  end
 
-  defp to_int(n) when is_integer(n), do: n
+  # The host's marks, for players in the game only.
+  defp judgements(s, judgements) do
+    for {peer, ok} <- judgements,
+        peer = to_int(peer),
+        Map.has_key?(s.players, peer),
+        into: %{},
+        do: {peer, ok == true}
+  end
 
-  defp to_int(n) when is_binary(n) do
+  defp first(list, n) when is_list(list), do: Enum.take(list, n)
+  defp first(_, _), do: []
+
+  defp text(value, max) when is_binary(value), do: String.slice(value, 0, max)
+  defp text(_, _), do: nil
+
+  # Sporcle sends it as a string ("90").
+  defp difficulty(n) when int?(n), do: Integer.to_string(n)
+  defp difficulty(n), do: text(n, 16)
+
+  defp integer(n) when int?(n), do: n
+  defp integer(_), do: nil
+
+  defp to_int(n) when int?(n), do: n
+
+  defp to_int(n) when is_binary(n) and byte_size(n) <= 16 do
     case Integer.parse(n) do
       {i, _} -> i
       :error -> nil

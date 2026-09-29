@@ -11,10 +11,10 @@ defmodule TriviaRelay.Seats.Intents do
 
   alias TriviaRelay.Seats.State
 
-  @questions_per_game [5, 10, 15, 20]
-  @question_seconds [15, 30, 45, 60]
+  @questions_per_game State.questions_per_game_choices()
+  @question_seconds State.question_seconds_choices()
   @audiences ~w(private friends anyone)
-  @final_votes ~w(easy medium hard)
+  @final_votes State.final_votes()
 
   def constants do
     %{
@@ -32,11 +32,16 @@ defmodule TriviaRelay.Seats.Intents do
   def handle(%State{status: status}, _intent, _payload) when status != :live,
     do: {:error, "not_live"}
 
-  def handle(s, "ready", %{"ready" => ready}) when is_boolean(ready),
-    do: {:ok, [{"player_update", %{readyForGame: ready}}], State.ready(s, ready)}
+  # A ready that changes nothing is not passed on: Sporcle tells every other player each
+  # time, so a repeated one would only be noise in their games.
+  def handle(s, "ready", %{"ready" => ready}) when is_boolean(ready) do
+    if State.ready?(s) == ready,
+      do: {:ok, [], s},
+      else: {:ok, [{"player_update", %{readyForGame: ready}}], State.ready(s, ready)}
+  end
 
   def handle(s, "draft", %{"text" => text} = p) when is_binary(text),
-    do: {:ok, [], State.draft(s, String.slice(text, 0, 200), p["wager"])}
+    do: {:ok, [], State.draft(s, String.slice(text, 0, 200), wager(p["wager"]))}
 
   def handle(%{phase: :question} = s, "answer", %{"text" => text, "wager" => wager})
       when is_binary(text) do
@@ -52,7 +57,7 @@ defmodule TriviaRelay.Seats.Intents do
   def handle(%{phase: :final_question} = s, "answer", %{"text" => text}) when is_binary(text) do
     if State.answered?(s, State.index(s)),
       do: {:error, "already_answered"},
-      else: answer(s, text, s.final.wager || 0)
+      else: answer(s, text, State.final_wager(s) || 0)
   end
 
   def handle(%{phase: :final_vote} = s, "final_vote", %{"choice" => choice})
@@ -64,7 +69,7 @@ defmodule TriviaRelay.Seats.Intents do
 
   def handle(%{phase: :final_wager} = s, "final_wager", %{"amount" => amount}) do
     cond do
-      s.final.wager != nil -> {:error, "already_wagered"}
+      State.final_wager(s) != nil -> {:error, "already_wagered"}
       amount not in State.final_wagers() -> {:error, "invalid_wager"}
       true -> {:ok, [{"submit_final_wager", %{wagerAmount: amount}}], State.wagered(s, amount)}
     end
@@ -121,11 +126,15 @@ defmodule TriviaRelay.Seats.Intents do
   end
 
   # Every tap sends the whole map, as the official app does; the server echoes it to
-  # everyone as `judgement_update`.
+  # everyone as `judgement_update`. Only players in the game can be marked.
   defp host(%{phase: phase} = s, "judge", %{"peer_id" => peer, "correct" => correct?})
        when phase in [:reveal, :final_reveal] and is_integer(peer) and is_boolean(correct?) do
-    s = State.judge(s, peer, correct?)
-    {:ok, [{"judgement_update", judgements(s)}], s}
+    if State.player?(s, peer) do
+      s = State.judge(s, peer, correct?)
+      {:ok, [{"judgement_update", judgements(s)}], s}
+    else
+      {:error, "invalid_intent"}
+    end
   end
 
   defp host(%{phase: phase} = s, "judge_submit", _) when phase in [:reveal, :final_reveal],
@@ -191,6 +200,9 @@ defmodule TriviaRelay.Seats.Intents do
       playerJudgements: Map.new(s.judgements, fn {peer, ok} -> {to_string(peer), ok} end)
     }
   end
+
+  defp wager(wager) when is_integer(wager), do: wager
+  defp wager(_), do: nil
 
   defp choice(value, allowed),
     do: if(value in allowed, do: {:ok, value}, else: {:error, "invalid_options"})

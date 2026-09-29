@@ -6,6 +6,7 @@ import '../../core/models/models.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
+import '../../shared/widgets/fz_toast.dart';
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/connection_providers.dart';
 import '../../shared/seat_flow.dart';
@@ -24,6 +25,8 @@ class LobbyView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final pending = ref.watch(pendingIntentsProvider);
     final me = state.me;
     final ready = me?.ready ?? false;
     final pack = state.pack;
@@ -38,8 +41,14 @@ class LobbyView extends ConsumerWidget {
             label: ready ? "You're ready" : "I'm ready",
             trailing: ready ? 'tap to undo' : null,
             kind: ready ? FzButtonKind.outline : FzButtonKind.primary,
-            onPressed: state.status == SeatStatus.live
-                ? () => act(context, ref, (c) => c.ready(!ready))
+            busy: pending.containsKey('ready'),
+            onPressed: canAct
+                ? () => act(
+                    context,
+                    ref,
+                    (c) => c.ready(!ready),
+                    pending: 'ready',
+                  )
                 : null,
           ),
           if (state.you.host) ...[
@@ -51,8 +60,9 @@ class LobbyView extends ConsumerWidget {
                   '${state.players.where((p) => p.ready).length}'
                   '/${state.players.length} ready',
               kind: FzButtonKind.pink,
-              onPressed: state.status == SeatStatus.live
-                  ? () => act(context, ref, (c) => c.start())
+              busy: pending.containsKey('start'),
+              onPressed: canAct
+                  ? () => act(context, ref, (c) => c.start(), pending: 'start')
                   : null,
             ),
           ],
@@ -79,10 +89,23 @@ class LobbyView extends ConsumerWidget {
               ),
               const SizedBox(width: 8),
               FzCircleButton(
+                key: const Key('copyCodeButton'),
                 icon: Icons.copy,
                 tooltip: 'Copy the code',
-                onPressed: () =>
-                    Clipboard.setData(ClipboardData(text: state.gameCode)),
+                onPressed: () => _copy(context, state.gameCode, 'Code copied.'),
+              ),
+              const SizedBox(width: 4),
+              // No share plugin is bundled: the invite goes on the clipboard,
+              // ready to paste into any chat.
+              FzCircleButton(
+                key: const Key('shareInviteButton'),
+                icon: Icons.ios_share,
+                tooltip: 'Copy an invite',
+                onPressed: () => _copy(
+                  context,
+                  inviteText(state.gameCode),
+                  'Invite copied. Paste it to your friends.',
+                ),
               ),
             ],
           ),
@@ -132,7 +155,7 @@ class LobbyView extends ConsumerWidget {
               kind: FzButtonKind.outline,
               height: 48,
               fontSize: 15,
-              onPressed: () => _changePack(context, ref),
+              onPressed: canAct ? () => _changePack(context, ref) : null,
             ),
             const SizedBox(height: 16),
             _HostOptions(state: state),
@@ -146,16 +169,31 @@ class LobbyView extends ConsumerWidget {
               player: player,
               you: player.peerId == state.you.peerId,
               trailing: player.ready
-                  ? const Icon(Icons.check_circle, color: FzColors.ok, size: 20)
+                  ? const Icon(
+                      Icons.check_circle,
+                      color: FzColors.ok,
+                      size: 20,
+                      semanticLabel: 'Ready',
+                    )
                   : const Icon(
                       Icons.radio_button_unchecked,
                       color: FzColors.faint,
                       size: 20,
+                      semanticLabel: 'Not ready',
                     ),
             ),
         ],
       ),
     );
+  }
+
+  static Future<void> _copy(
+    BuildContext context,
+    String text,
+    String done,
+  ) async {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (context.mounted) showFzToast(context, done);
   }
 
   /// The host picks another pack; everybody stays. The lobby shows it once
@@ -188,10 +226,14 @@ class _HostOptions extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
-    final current = HostOptions(
-      questionsPerGame: state.options.questionsPerGame,
-      questionSeconds: state.options.questionSeconds,
-    );
+    final canAct = ref.watch(seatInteractiveProvider);
+    // A change just sent shows at once, ahead of the relay.
+    final current =
+        ref.watch(pendingIntentsProvider)['options'] as HostOptions? ??
+        HostOptions(
+          questionsPerGame: state.options.questionsPerGame,
+          questionSeconds: state.options.questionSeconds,
+        );
 
     Widget chips(
       String prefix,
@@ -208,8 +250,18 @@ class _HostOptions extends ConsumerWidget {
             key: Key('$prefix-$value'),
             label: Text(label(value), style: fz.m(12)),
             selected: value == selected,
-            onSelected: (_) =>
-                act(context, ref, (c) => c.options(change(value))),
+            onSelected: canAct
+                ? (_) {
+                    final options = change(value);
+                    act(
+                      context,
+                      ref,
+                      (c) => c.options(options),
+                      pending: 'options',
+                      value: options,
+                    );
+                  }
+                : null,
           ),
       ],
     );
@@ -236,3 +288,6 @@ class _HostOptions extends ConsumerWidget {
     );
   }
 }
+
+/// What "Copy an invite" puts on the clipboard.
+String inviteText(String code) => 'Join my Trivia Relay game: code $code';

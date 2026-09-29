@@ -19,6 +19,12 @@ class FakeSeatConnection implements SeatConnection {
   /// Thrown by the next intent, if set.
   GameError? intentError;
 
+  /// While set and not complete, [leave] waits on it, as a slow relay would.
+  Completer<void>? holdLeave;
+
+  /// While set and not complete, every intent waits on it before answering.
+  Completer<void>? holdIntents;
+
   void emit(SeatState state) => _state.add(state);
   void emitStatus(ConnectionStatus status) => _status.add(status);
 
@@ -33,6 +39,8 @@ class FakeSeatConnection implements SeatConnection {
 
   Future<void> _record(String call) async {
     calls.add(call);
+    final hold = holdIntents;
+    if (hold != null && !call.startsWith('attach')) await hold.future;
     final error = intentError;
     intentError = null;
     if (error != null) throw error;
@@ -71,6 +79,7 @@ class FakeSeatConnection implements SeatConnection {
   @override
   Future<void> leave() async {
     calls.add('leave');
+    await holdLeave?.future;
     if (!closedCompleter.isCompleted) {
       closedCompleter.complete(SeatClosedReason.left);
     }

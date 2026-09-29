@@ -24,6 +24,7 @@ config :trivia_relay,
   drain_ms: 0,
   seat_hold_ms: 60_000,
   rate_limit_enabled: false,
+  cache_enabled: false,
   sporcle_http: [plug: {Req.Test, TriviaRelay.Sporcle}],
   sporcle_api_key: "test-api-key",
   upstream: TriviaRelay.FakeUpstream

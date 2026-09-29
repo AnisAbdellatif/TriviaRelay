@@ -136,6 +136,23 @@ final round, about 3½ minutes)
   `purchased`, `free`, `all` with an empty sort. Pages of 20; the page after the last is
   empty. Search text combines with a type. `img_src` is an empty string for a pack without a
   picture. The image hosts (`static.sporcle.com`, a CloudFront bucket) send no CORS headers.
+- **Joinable games** (confirmed live, 2026-09-28): `GET getJoinableGames`, no parameters,
+  answers `{invitedGames, friendGames, publicGames}`, each a list of `{gameCode, gamePack:
+  {id (a string), name, description, img_src}, gameScreen, host: {playerId,
+  sporcleHandle}, currentHost, playerCount, hasImages, creationTime, location, distance}`.
+  `gameScreen` was `Lobby`, `Question <n>` (from 1) or `Final Question`. One call listed 78
+  public games, 55 of them in their lobby, the rest mid-game. `distance` (km) ranks them from
+  the caller; its origin is unknown (the relay sends no location), so the relay ignores it.
+  Joining one is the usual `joinGame` with its code. The official app also listens for
+  live changes over an API-Gateway socket (`registerForJoinScreenUpdates`), which isn't used.
+- **Removing a player** (decompiled only, 1.5.15): the host's player menu offers "Eject"
+  (they may rejoin) and "Kick" (they may not), each sending `bounce {peerId, playerId,
+  noReturn}` with `noReturn` true for a kick. The removed player's client handles `bounce`
+  without checking whom it names, so Sporcle sends it to that player alone: it reads
+  `noReturn` and `reject`, disconnects, and shows "The host just ejected you" (with "Join
+  Again"), "You have been kicked from this game and may not rejoin", or, for `reject` (a
+  kicked player joining again), "You cannot join this game". What reaches the other
+  players, and whether Sporcle closes the socket itself, isn't known yet.
 - **Changing the pack in the lobby** (decompiled only, 1.5.15): the host sends
   `change_pack {gamePack: <the pack>}`, the catalog's map for it, and every client listens
   for `change_pack` with the same payload. The app refuses the host's own draft packs
@@ -233,6 +250,8 @@ and, in the relay/app, the wrong user agent. Implemented in
 
 ## Still open
 - `edit_options` in the lobby, `bounce` (kick) and `promote_new_host`, all untried live.
+  For `bounce`, what the removed player receives (the decompiled client reads only
+  `noReturn` and `reject`) and what the others see.
 - A player dropping and rejoining during the final round and during judging (only mid-question
   was tested).
 - The host: what happens when the host drops and rejoins, and what a host this client was

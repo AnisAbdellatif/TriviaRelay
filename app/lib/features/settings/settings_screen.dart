@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/config_providers.dart';
+import '../../core/providers/connection_providers.dart';
 import '../../core/update/app_version.dart';
 import '../../shared/navigation.dart';
 import '../../shared/theme/fz_theme.dart';
@@ -21,11 +22,50 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   late final _server = TextEditingController(
     text: ref.read(serverBaseUrlProvider),
   );
+  bool _signingOut = false;
 
   @override
   void dispose() {
     _server.dispose();
     super.dispose();
+  }
+
+  /// Signing out forgets the seat this phone holds, so it leaves it too, after
+  /// asking: a seat nobody can come back to would only sit in the game until
+  /// its hold ran out.
+  Future<void> _signOut() async {
+    final seat = ref.read(currentSeatProvider).value;
+    if (seat != null) {
+      final leave = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Sign out?'),
+          content: Text(
+            'You’re still in game ${seat.gameCode}. Signing out leaves it.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Stay'),
+            ),
+            TextButton(
+              key: const Key('confirmSignOutButton'),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Leave and sign out'),
+            ),
+          ],
+        ),
+      );
+      if (leave != true || !mounted) return;
+    }
+    setState(() => _signingOut = true);
+    try {
+      if (seat != null) await ref.read(currentSeatProvider.notifier).leave();
+      await ref.read(accountProvider.notifier).signOut();
+    } finally {
+      if (mounted) setState(() => _signingOut = false);
+    }
+    if (mounted) goHome(context);
   }
 
   @override
@@ -48,12 +88,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
         footer: FzButton(
           key: const Key('signOutButton'),
-          label: 'Sign out',
+          label: _signingOut ? 'Signing out…' : 'Sign out',
           kind: FzButtonKind.outline,
-          onPressed: () async {
-            await ref.read(accountProvider.notifier).signOut();
-            if (context.mounted) goHome(context);
-          },
+          onPressed: _signingOut ? null : _signOut,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,

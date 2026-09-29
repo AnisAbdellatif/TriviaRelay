@@ -92,12 +92,92 @@ defmodule TriviaRelayWeb.SeatChannelTest do
     assert_receive :upstream_closed
   end
 
-  test "the host removing the player ends the seat" do
+  describe "the host removing the player" do
+    # Sporcle sends `bounce` to the removed player only; the official app reads just
+    # `noReturn` and `reject` from it (decompiled).
+    for {name, payload, can_rejoin} <- [
+          {"ejects: they may join again", %{"noReturn" => false}, true},
+          {"kicks: they may not", %{"peerId" => 2, "noReturn" => true}, false},
+          {"refuses a kicked player coming back", %{"reject" => true}, false},
+          {"with nothing said", nil, true}
+        ] do
+      test "#{name}" do
+        seat = start_seat()
+        {:ok, _, _} = join_seat(seat)
+        lobby(seat.seat)
+        sporcle(seat.seat, "bounce", unquote(Macro.escape(payload)))
+
+        assert_push "seat_closed", %{reason: "removed", can_rejoin: unquote(can_rejoin)}
+        assert_receive :upstream_closed
+      end
+    end
+  end
+
+  test "intents are limited per seat, whichever phone sends them" do
     seat = start_seat()
-    {:ok, _, _} = join_seat(seat)
+    {:ok, _, first} = join_seat(seat)
     lobby(seat.seat)
-    sporcle(seat.seat, "bounce", %{"peerId" => 2, "playerId" => "sporcle_id//joinPlayer"})
-    assert_push "seat_closed", %{reason: "removed"}
-    assert_receive :upstream_closed
+
+    # A second phone on its own socket (a transport of its own, forwarding to this test):
+    # the per-socket meter alone would let it through.
+    test = self()
+    transport = spawn_link(fn -> forward(test) end)
+
+    {:ok, _, second} =
+      %{socket(UserSocket, nil, %{ip: "198.51.100.2"}) | transport_pid: transport}
+      |> subscribe_and_join(SeatChannel, "seat:" <> seat.id, %{
+        "seat_token" => seat.token,
+        "protocol_version" => Protocol.major()
+      })
+
+    for _ <- 1..30 do
+      ref = push(first, "draft", %{"text" => "a", "wager" => 1})
+      assert_reply ref, :ok
+      ref = push(second, "draft", %{"text" => "b", "wager" => 1})
+      assert_reply ref, :ok
+    end
+
+    ref = push(second, "draft", %{"text" => "c", "wager" => 1})
+    assert_reply ref, :error, %{code: "rate_limited"}
+  end
+
+  defp forward(test) do
+    receive do
+      message ->
+        send(test, message)
+        forward(test)
+    end
+  end
+
+  test "a ready that changes nothing doesn't reach Sporcle" do
+    seat = start_seat()
+    {:ok, _, socket} = join_seat(seat)
+    lobby(seat.seat)
+
+    ref = push(socket, "ready", %{"ready" => true})
+    assert_reply ref, :ok
+    assert_receive {:sent, "player_update", %{readyForGame: true}}
+
+    ref = push(socket, "ready", %{"ready" => true})
+    assert_reply ref, :ok
+    refute_receive {:sent, "player_update", _}, 100
+  end
+
+  test "a phone pushed off its seat by newer ones is closed without a word" do
+    seat = start_seat(max_phones: 1)
+    {:ok, _, first} = join_seat(seat)
+    Process.unlink(first.channel_pid)
+    ref = Process.monitor(first.channel_pid)
+
+    {:ok, _, _second} = join_seat(seat)
+    assert_receive {:DOWN, ^ref, _, _, :normal}
+    refute_received %Phoenix.Socket.Message{event: "seat_closed"}
+  end
+
+  test "the same player taking a new seat closes the old one as left, replaced" do
+    old = start_seat()
+    {:ok, _, _} = join_seat(old)
+    _new = start_seat(me: old.me)
+    assert_push "seat_closed", %{reason: "left", replaced: true}
   end
 end

@@ -6,7 +6,7 @@ defmodule TriviaRelay.Seats.View do
   Sporcle sends `list_answers` with the correct answer and everybody's guesses on every
   submission, long before the reveal. The official app shows a player the others'
   guesses once they have answered themselves, and the correct answer only when the host
-  reveals, and so does this.
+  reveals, and so does this. Final wagers are likewise hidden while wagering.
   """
 
   alias TriviaRelay.Protocol
@@ -96,12 +96,24 @@ defmodule TriviaRelay.Seats.View do
       votes: s.final.votes,
       picked: s.final.picked,
       vote: s.final.vote,
-      wager: s.final.wager,
-      wagers: s.final.wagers |> Enum.sort() |> Enum.map(fn {p, w} -> %{peer_id: p, wager: w} end)
+      wager: State.final_wager(s),
+      wagers:
+        s
+        |> final_wagers(phase)
+        |> Enum.sort()
+        |> Enum.map(fn {p, w} -> %{peer_id: p, wager: w} end)
     }
   end
 
   defp final(_), do: nil
+
+  # Sporcle sends every wager as it is placed. While the final is still being wagered, a
+  # seat sees only its own amount (and who has wagered, `players[].final_wagered`), so
+  # nobody can wager knowing the others'. Once the question is asked they are all fixed.
+  defp final_wagers(s, phase) when phase in [:final_vote, :final_wager],
+    do: Map.take(s.final.wagers, [s.peer_id])
+
+  defp final_wagers(s, _phase), do: s.final.wagers
 
   defp stringify(map), do: Map.new(map, fn {k, v} -> {to_string(k), v} end)
 end
