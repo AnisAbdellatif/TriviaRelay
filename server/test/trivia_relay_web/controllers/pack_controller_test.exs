@@ -29,7 +29,7 @@ defmodule TriviaRelayWeb.PackControllerTest do
       conn
       |> put_req_header("x-player-id", "p1")
       |> put_req_header("x-player-token", "t")
-      |> put_req_header("x-device-id", "d")
+      |> put_req_header("x-device-id", "0123456789abcdef")
       |> get(~p"/api/packs?q=flags&page=1")
 
     assert %{
@@ -50,7 +50,7 @@ defmodule TriviaRelayWeb.PackControllerTest do
       conn
       |> put_req_header("x-player-id", "p1")
       |> put_req_header("x-player-token", "t")
-      |> put_req_header("x-device-id", "d")
+      |> put_req_header("x-device-id", "0123456789abcdef")
       |> get(path)
     end
 
@@ -92,5 +92,78 @@ defmodule TriviaRelayWeb.PackControllerTest do
 
   test "needs credentials", %{conn: conn} do
     assert %{"code" => "invalid_player"} = conn |> get(~p"/api/packs?q=x") |> json_response(400)
+  end
+
+  test "a search that isn't text is refused, not a crash", %{conn: conn} do
+    Req.Test.stub(TriviaRelay.Sporcle, fn _ -> flunk("Sporcle was called") end)
+
+    conn =
+      conn
+      |> put_req_header("x-player-id", "p1")
+      |> put_req_header("x-player-token", "t")
+      |> put_req_header("x-device-id", "0123456789abcdef")
+      |> get("/api/packs?q[]=x")
+
+    assert %{"code" => "invalid_request"} = json_response(conn, 400)
+  end
+
+  describe "one pack" do
+    defp ask(conn, path) do
+      conn
+      |> put_req_header("x-player-id", "p1")
+      |> put_req_header("x-player-token", "t")
+      |> put_req_header("x-device-id", "0123456789abcdef")
+      |> get(path)
+    end
+
+    test "says whether this player bookmarked and subscribed to it", %{conn: conn} do
+      Req.Test.stub(TriviaRelay.Sporcle, fn conn ->
+        assert conn.request_path == "/api/party/getPack"
+        assert Plug.Conn.fetch_query_params(conn).query_params == %{"pack_id" => "156070"}
+
+        Req.Test.json(conn, %{
+          "pack" => %{
+            "id" => 156_070,
+            "name" => "Flags",
+            "img_src" => "",
+            "has_images" => true,
+            "bookmarked" => true,
+            "subscribed" => false
+          }
+        })
+      end)
+
+      assert %{
+               "pack" => %{
+                 "id" => 156_070,
+                 "image_url" => nil,
+                 "has_images" => true,
+                 "bookmarked" => true,
+                 "subscribed" => false
+               }
+             } = conn |> ask(~p"/api/packs/156070") |> json_response(200)
+    end
+
+    test "one Sporcle doesn't have is not found", %{conn: conn} do
+      Req.Test.stub(TriviaRelay.Sporcle, &Req.Test.json(&1, %{"pack" => nil}))
+
+      assert %{"code" => "pack_not_found"} =
+               conn |> ask(~p"/api/packs/5") |> json_response(404)
+
+      Req.Test.stub(TriviaRelay.Sporcle, fn _ -> flunk("Sporcle was called") end)
+
+      assert %{"code" => "pack_not_found"} =
+               conn |> ask("/api/packs/-3") |> json_response(404)
+    end
+
+    test "a random one is the catalog's pick", %{conn: conn} do
+      Req.Test.stub(TriviaRelay.Sporcle, fn conn ->
+        assert conn.request_path == "/api/party/getRandomPack"
+        Req.Test.json(conn, %{"pack" => %{"id" => 3, "name" => "Rivers", "num_questions" => 40}})
+      end)
+
+      assert %{"pack" => %{"id" => 3, "name" => "Rivers", "num_questions" => 40}} =
+               conn |> ask(~p"/api/packs/random") |> json_response(200)
+    end
   end
 end

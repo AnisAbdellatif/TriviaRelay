@@ -11,28 +11,50 @@ defmodule TriviaRelay.Seats.Seat do
   With no phone attached, the seat carries on for `:seat_hold_ms` (`SEAT_HOLD_SECONDS`,
   configured per deployment) and then leaves the game. Until then Sporcle sees a player
   who never went away, and when a question's time runs out the seat answers for the
-  player the way the official app does (`State.due/2`).
+  player the way the official app does (`State.due/2`). A seat no phone has attached to
+  yet is held only for `:seat_attach_ms`: the phone that asked for it attaches at once.
+
+  The game's chat is open to Sporcle while any attached phone has it open (the phone's
+  `chat_open` and `chat_close`), as the official app opens it with its chat screen; a seat
+  with no phone never has it open.
+
+  One player has one seat: a new seat for the same Sporcle account ends the old one
+  (`left`, with `replaced: true`), and takes over what it had spent in the same game
+  (`State.carry_over/2`). At most `:seat_max_phones` phones are attached at a time; the
+  oldest makes way for a new one.
 
   The seat ends when the phone leaves, the hold runs out, the host removes the player,
-  or the server shuts down; every attached phone is told why (`{:seat_closed, reason}`).
-  If the upstream socket fails, the seat stays up as `lost` so the phone can say so
-  (rejoining Sporcle from here is a later step).
+  the same player takes another seat, it reaches `:seat_max_ms` (a seat token's life),
+  or the server shuts down; every attached phone is told why
+  (`{:seat_closed, %{reason: …}}`). If the upstream socket fails, the seat stays up as
+  `lost` so the phone can say so (rejoining Sporcle from here is a later step).
+
+  Sporcle's events are folded defensively (`State.apply_event/4` ignores what does not
+  fit), and an event that still raises is dropped, keeping the state it found. Crash
+  reports and `:sys.get_status/1` show a summary, never the players or their answers.
   """
 
   use GenServer, restart: :temporary
+
+  require Logger
 
   alias TriviaRelay.Seats.{Intents, State, View}
 
   @broadcast_interval_ms 100
   @default_hold_ms 300_000
+  @default_attach_ms 30_000
+  # A seat token lives a day (`TriviaRelay.Seats`), and so does a seat.
+  @default_max_ms 86_400_000
+  @default_max_phones 3
+  @players TriviaRelay.Seats.Players
 
   def constants, do: %{"broadcast_interval_ms" => @broadcast_interval_ms}
 
   @doc """
   Options: `:id`, `:game_code`, `:me` (the Sporcle id, `sporcle_id//…`), `:session`
   (the `playerSession` from createGame or joinGame), `:player` (the login JSON), and
-  optionally `:now`, `:hold_ms`, `:broadcast_interval_ms` and `:upstream` (a module with
-  the `Upstream` API, for tests).
+  optionally `:poppers` (the Party Poppers Sporcle said the player had), `:now`, `:hold_ms`, `:attach_ms`, `:max_ms`, `:max_phones`,
+  `:broadcast_interval_ms` and `:upstream` (a module with the `Upstream` API, for tests).
   """
   def start_link(opts) do
     GenServer.start_link(__MODULE__, Map.new(opts), name: via(Keyword.fetch!(opts, :id)))
@@ -71,23 +93,22 @@ defmodule TriviaRelay.Seats.Seat do
         Application.get_env(:trivia_relay, :upstream, TriviaRelay.Sporcle.Upstream)
       end)
 
-    {:ok, pid} =
-      upstream.start_link(
-        owner: self(),
-        label: opts.id,
-        session: opts.session,
-        player: opts.player
-      )
-
     state = %{
       id: opts.id,
       game_code: opts.game_code,
-      state: State.new(opts.me),
+      state: State.new(opts.me, Map.get(opts, :poppers)),
       now: now,
       upstream_mod: upstream,
-      upstream: pid,
+      upstream: nil,
       conns: %{},
-      hold_ms: Map.get_lazy(opts, :hold_ms, &hold_ms/0),
+      # The phones with the chat open.
+      chat_viewers: MapSet.new(),
+      attached: 0,
+      hold_ms: Map.get_lazy(opts, :hold_ms, fn -> env(:seat_hold_ms, @default_hold_ms) end),
+      attach_ms:
+        Map.get_lazy(opts, :attach_ms, fn -> env(:seat_attach_ms, @default_attach_ms) end),
+      max_phones:
+        Map.get_lazy(opts, :max_phones, fn -> env(:seat_max_phones, @default_max_phones) end),
       hold_timer: nil,
       deadline_timer: nil,
       interval: Map.get_lazy(opts, :broadcast_interval_ms, &broadcast_interval_ms/0),
@@ -95,28 +116,71 @@ defmodule TriviaRelay.Seats.Seat do
       last_broadcast_at: nil
     }
 
-    # Nobody is attached yet: the phone that asked for this seat has the hold to arrive.
-    {:ok, start_hold(state)}
+    Process.send_after(
+      self(),
+      :lifetime,
+      Map.get_lazy(opts, :max_ms, fn -> env(:seat_max_ms, @default_max_ms) end)
+    )
+
+    # Nobody is attached yet: the phone that asked for this seat has a moment to arrive.
+    # Taking the player's place (ending any seat they already have) and connecting to
+    # Sporcle wait for `handle_continue/2`, so the seats supervisor is not held up.
+    {:ok, start_hold(state), {:continue, {:connect, opts}}}
+  end
+
+  @impl true
+  def handle_continue({:connect, opts}, s) do
+    case claim(opts.me, s.game_code) do
+      {:ok, earlier} ->
+        state = if earlier, do: State.carry_over(s.state, earlier), else: s.state
+
+        {:ok, pid} =
+          s.upstream_mod.start_link(
+            owner: self(),
+            label: opts.id,
+            session: opts.session,
+            player: opts.player
+          )
+
+        {:noreply, %{s | state: state, upstream: pid}}
+
+      :error ->
+        {:stop, :normal, close_seat(s, "left", %{replaced: true})}
+    end
   end
 
   @impl true
   def handle_call({:attach, pid}, _from, s) do
-    s =
-      if Map.has_key?(s.conns, pid),
-        do: s,
-        else: %{s | conns: Map.put(s.conns, pid, Process.monitor(pid))}
-
+    s = if Map.has_key?(s.conns, pid), do: s, else: add_phone(s, pid)
     s = cancel_hold(s)
-    send(pid, {:seat_state, View.snapshot(s.state, s.game_code, s.now.())})
+    if view = snapshot(s), do: send(pid, {:seat_state, view})
     {:reply, :ok, s}
+  end
+
+  # Another seat of the same player's is taking over: it gets what this one spent, if it
+  # is in the same game, and this one ends.
+  def handle_call({:replaced, game_code}, _from, s) do
+    earlier = if game_code == s.game_code, do: s.state
+    {:stop, :normal, {:ok, earlier}, close_seat(s, "left", %{replaced: true})}
   end
 
   def handle_call({:intent, "leave", _payload}, _from, s) do
     {:stop, :normal, :ok, close_seat(s, "left")}
   end
 
+  # A phone opening or closing its chat screen: the chat is open while any phone has it.
+  def handle_call({:intent, intent, _payload}, {pid, _tag}, s)
+      when intent in ~w(chat_open chat_close) do
+    viewers =
+      if intent == "chat_open" and Map.has_key?(s.conns, pid),
+        do: MapSet.put(s.chat_viewers, pid),
+        else: MapSet.delete(s.chat_viewers, pid)
+
+    {:reply, :ok, sync_chat(%{s | chat_viewers: viewers})}
+  end
+
   def handle_call({:intent, intent, payload}, _from, s),
-    do: reply_intent(Intents.handle(s.state, intent, payload || %{}), s)
+    do: reply_intent(Intents.handle(s.state, intent, payload || %{}, context(s)), s)
 
   def handle_call({:change_pack, pack}, _from, s),
     do: reply_intent(Intents.change_pack(s.state, pack), s)
@@ -125,13 +189,22 @@ defmodule TriviaRelay.Seats.Seat do
   def handle_cast({:close, reason}, s), do: {:stop, :normal, close_seat(s, reason)}
 
   @impl true
-  def handle_info({:upstream, _label, {:event, event, payload}}, s) do
-    state = State.apply_event(s.state, event, payload, s.now.())
-    s = %{s | state: state} |> schedule_deadline() |> broadcast()
+  def handle_info({:upstream, _label, {:event, event, payload, sender}}, s) do
+    if forged?(event, sender) do
+      Logger.warning(
+        "seat #{s.id}: dropped forged Sporcle event " <>
+          "#{inspect(String.slice(to_string(event), 0, 40))} from peer #{sender}"
+      )
 
-    if state.status == :removed,
-      do: {:stop, :normal, close_seat(s, "removed")},
-      else: {:noreply, s}
+      {:noreply, s}
+    else
+      state = fold(s, event, payload)
+      s = %{s | state: state} |> sync_chat() |> schedule_deadline() |> broadcast()
+
+      if state.status == :removed,
+        do: {:stop, :normal, close_seat(s, "removed", %{can_rejoin: state.can_rejoin})},
+        else: {:noreply, s}
+    end
   end
 
   def handle_info({:upstream, _label, {:closed, _reason}}, s) do
@@ -143,12 +216,13 @@ defmodule TriviaRelay.Seats.Seat do
   def handle_info({:DOWN, _ref, :process, pid, _reason}, s) do
     case Map.pop(s.conns, pid) do
       {nil, _} -> {:noreply, s}
-      {_ref, conns} when conns == %{} -> {:noreply, start_hold(%{s | conns: conns})}
-      {_ref, conns} -> {:noreply, %{s | conns: conns}}
+      {_phone, conns} when conns == %{} -> {:noreply, start_hold(gone(s, pid, conns))}
+      {_phone, conns} -> {:noreply, gone(s, pid, conns)}
     end
   end
 
   def handle_info(:hold_expired, s), do: {:stop, :normal, close_seat(s, "expired")}
+  def handle_info(:lifetime, s), do: {:stop, :normal, close_seat(s, "expired")}
 
   def handle_info(:deadline, s) do
     now = s.now.()
@@ -175,8 +249,7 @@ defmodule TriviaRelay.Seats.Seat do
     do: {:noreply, %{s | state: State.overtime(s.state, index)} |> broadcast()}
 
   def handle_info(:flush, s) do
-    view = View.snapshot(s.state, s.game_code, s.now.())
-    Enum.each(Map.keys(s.conns), &send(&1, {:seat_state, view}))
+    if view = snapshot(s), do: Enum.each(Map.keys(s.conns), &send(&1, {:seat_state, view}))
     {:noreply, %{s | flush: nil, last_broadcast_at: System.monotonic_time(:millisecond)}}
   end
 
@@ -191,17 +264,182 @@ defmodule TriviaRelay.Seats.Seat do
     :ok
   end
 
+  # Crash reports and `:sys.get_status/1` carry the other players' names, ids and answers,
+  # and the login's device id, none of which belong in a log: they get a summary instead.
+  @impl true
+  def format_status(status) do
+    Map.new(status, fn
+      {:state, %{state: %State{}} = s} ->
+        {:state,
+         %{
+           id: s.id,
+           game_code: s.game_code,
+           status: s.state.status,
+           phase: s.state.phase,
+           phones: map_size(s.conns),
+           upstream: s.upstream
+         }}
+
+      {:state, _} ->
+        {:state, :redacted}
+
+      {:message, message} ->
+        {:message, tag(message)}
+
+      {:queue, queue} when is_list(queue) ->
+        {:queue, Enum.map(queue, &tag/1)}
+
+      {:log, _} ->
+        {:log, []}
+
+      {:reason, reason} ->
+        {:reason, reason(reason)}
+
+      other ->
+        other
+    end)
+  end
+
   ## Helpers
 
+  # One player, one seat: registers this seat as the player's, ending the seat they had
+  # before. Returns that seat's state when it was in the same game.
+  defp claim(me, game_code, attempts \\ 50)
+  defp claim(_me, _game_code, 0), do: :error
+
+  defp claim(me, game_code, attempts) do
+    case Registry.register(@players, me, nil) do
+      {:ok, _} ->
+        {:ok, nil}
+
+      {:error, {:already_registered, earlier}} ->
+        taken = take_over(earlier, game_code)
+
+        case claim(me, game_code, attempts - 1) do
+          {:ok, nil} -> {:ok, taken}
+          other -> other
+        end
+    end
+  end
+
+  defp take_over(earlier, game_code) do
+    ref = Process.monitor(earlier)
+
+    taken =
+      try do
+        {:ok, taken} = GenServer.call(earlier, {:replaced, game_code})
+        taken
+      catch
+        :exit, _ ->
+          Process.exit(earlier, :kill)
+          nil
+      end
+
+    # The registry lets go of a seat once it has seen it stop, which may be a moment
+    # after this process hears of it.
+    receive do
+      {:DOWN, ^ref, :process, _, _} -> Process.sleep(1)
+    after
+      5_000 -> Process.exit(earlier, :kill)
+    end
+
+    taken
+  end
+
+  # The oldest phone makes way once `max_phones` are attached: it is told nothing, and its
+  # channel closes (`{:seat_detached}`), so it does not rejoin and push the new one out.
+  defp add_phone(s, pid) do
+    s =
+      if map_size(s.conns) >= s.max_phones do
+        {oldest, {ref, _}} = Enum.min_by(s.conns, fn {_pid, {_ref, n}} -> n end)
+        Process.demonitor(ref, [:flush])
+        send(oldest, :seat_detached)
+        gone(s, oldest, Map.delete(s.conns, oldest))
+      else
+        s
+      end
+
+    n = s.attached + 1
+    %{s | conns: Map.put(s.conns, pid, {Process.monitor(pid), n}), attached: n}
+  end
+
+  # A phone is gone: it no longer has the chat open.
+  defp gone(s, pid, conns),
+    do: sync_chat(%{s | conns: conns, chat_viewers: MapSet.delete(s.chat_viewers, pid)})
+
+  # Tells Sporcle whether the chat is open, when that changed (`Intents.chat_view/2`).
+  defp sync_chat(s) do
+    {messages, state} = Intents.chat_view(s.state, MapSet.size(s.chat_viewers) > 0)
+    Enum.each(messages, &send_upstream(s, &1))
+    if state == s.state, do: s, else: broadcast(%{s | state: state})
+  end
+
+  # What an intent needs that only the seat can give: the time, and a fresh id.
+  defp context(s), do: %{now: s.now.(), id: uuid()}
+
+  # A random (version 4) UUID, as GiftedChat gives each message.
+  defp uuid do
+    <<a::48, _::4, b::12, _::2, c::62>> = :crypto.strong_rand_bytes(16)
+
+    <<a::48, 4::4, b::12, 2::2, c::62>>
+    |> Base.encode16(case: :lower)
+    |> then(fn <<p1::binary-8, p2::binary-4, p3::binary-4, p4::binary-4, p5::binary-12>> ->
+      Enum.join([p1, p2, p3, p4, p5], "-")
+    end)
+  end
+
+  # Sporcle's server never checks that the sender of a `promote_new_host` or `bounce` is
+  # the host, and `sendTo` carries any event to a named player (confirmed live, 2026-10-12).
+  # So a rogue client could forge a `promote_to_host`, a `bounce` or a `player_update` to
+  # this seat and make the relay believe it had become host, been kicked, or that a player's
+  # host flag had changed. A message from Sporcle's server carries sender (f5) `-1`; a
+  # `sendTo` from another player carries that player's peer id (a positive integer). The
+  # relay trusts only the server, dropping any game event sent by a peer. `honk` is the one
+  # event the app expects player-to-player, so it alone is let through.
+  defp forged?(event, sender), do: is_integer(sender) and sender > 0 and event != "honk"
+
+  # An event the state cannot take is dropped, and the state kept as it was. Only the
+  # event's name is logged: the payload is other players'.
+  defp fold(s, event, payload) do
+    State.apply_event(s.state, event, payload, s.now.())
+  rescue
+    error ->
+      Logger.warning(
+        "seat #{s.id}: dropped Sporcle event #{inspect(String.slice(to_string(event), 0, 40))} " <>
+          "(#{inspect(error.__struct__)})"
+      )
+
+      s.state
+  end
+
+  defp snapshot(s) do
+    View.snapshot(s.state, s.game_code, s.now.())
+  rescue
+    error ->
+      Logger.error("seat #{s.id}: could not build a snapshot (#{inspect(error.__struct__)})")
+      nil
+  end
+
+  # Sends are casts: a stalled socket must not hold up the seat.
   defp send_upstream(%{upstream: nil}, _message), do: :ok
 
   defp send_upstream(s, {event, payload}) do
-    _ = s.upstream_mod.send_event(s.upstream, event, payload)
+    _ = s.upstream_mod.cast_event(s.upstream, event, payload)
     :ok
   end
 
-  defp close_seat(s, reason) do
-    Enum.each(Map.keys(s.conns), &send(&1, {:seat_closed, reason}))
+  # For one player alone, from this seat's own peer.
+  defp send_upstream(%{state: %{peer_id: me}} = s, {:to, peer, event, payload})
+       when is_integer(me) do
+    _ = s.upstream_mod.cast_event_to(s.upstream, peer, me, event, payload)
+    :ok
+  end
+
+  defp send_upstream(_s, {:to, _peer, _event, _payload}), do: :ok
+
+  defp close_seat(s, reason, details \\ %{}) do
+    closed = Map.put(details, :reason, reason)
+    Enum.each(Map.keys(s.conns), &send(&1, {:seat_closed, closed}))
     if s.upstream, do: s.upstream_mod.close(s.upstream)
     %{s | upstream: nil, conns: %{}}
   end
@@ -249,9 +487,12 @@ defmodule TriviaRelay.Seats.Seat do
     end
   end
 
+  # A seat no phone has come to yet is held only briefly (`attach_ms`), never longer than
+  # the hold itself.
   defp start_hold(s) do
     s = cancel_hold(s)
-    %{s | hold_timer: Process.send_after(self(), :hold_expired, s.hold_ms)}
+    hold = if s.attached == 0, do: min(s.attach_ms, s.hold_ms), else: s.hold_ms
+    %{s | hold_timer: Process.send_after(self(), :hold_expired, hold)}
   end
 
   defp cancel_hold(%{hold_timer: nil} = s), do: s
@@ -261,7 +502,28 @@ defmodule TriviaRelay.Seats.Seat do
     %{s | hold_timer: nil}
   end
 
-  defp hold_ms, do: Application.get_env(:trivia_relay, :seat_hold_ms, @default_hold_ms)
+  defp env(key, default), do: Application.get_env(:trivia_relay, key, default)
+
+  defp tag({:"$gen_call", _from, request}), do: {:"$gen_call", tag(request)}
+  defp tag({:"$gen_cast", request}), do: {:"$gen_cast", tag(request)}
+  defp tag({:upstream, _label, {kind, name, _}}), do: {:upstream, kind, name}
+  defp tag({:upstream, _label, message}), do: {:upstream, tag(message)}
+  defp tag(message) when is_tuple(message) and tuple_size(message) > 0, do: elem(message, 0)
+  defp tag(message) when is_atom(message), do: message
+  defp tag(_message), do: :redacted
+
+  # A crash's reason keeps the exception's kind and where it happened, not the terms.
+  defp reason({%{__exception__: true} = error, stack}) when is_list(stack),
+    do: {error.__struct__, Enum.map(stack, &frame/1)}
+
+  defp reason({kind, stack}) when is_atom(kind) and is_list(stack),
+    do: {kind, Enum.map(stack, &frame/1)}
+
+  defp reason(reason) when is_atom(reason), do: reason
+  defp reason(reason), do: tag(reason)
+
+  defp frame({m, f, args, location}) when is_list(args), do: {m, f, length(args), location}
+  defp frame(frame), do: frame
 
   defp broadcast_interval_ms,
     do: Application.get_env(:trivia_relay, :broadcast_interval_ms, @broadcast_interval_ms)

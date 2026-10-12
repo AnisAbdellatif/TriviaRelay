@@ -50,18 +50,18 @@ final class RelayApiProvider
 
 String _$relayApiHash() => r'a6b752c8e4eaa5c13980e328e3efa95f3c41cdc4';
 
-/// The seat the app is in, kept on the device so a closed app can go back to
-/// it. Null when it isn't in one.
+/// The seat the signed-in player is in, kept on the device so a closed app can
+/// go back to it. Null when they aren't in one, or nobody is signed in.
 
 @ProviderFor(CurrentSeat)
 final currentSeatProvider = CurrentSeatProvider._();
 
-/// The seat the app is in, kept on the device so a closed app can go back to
-/// it. Null when it isn't in one.
+/// The seat the signed-in player is in, kept on the device so a closed app can
+/// go back to it. Null when they aren't in one, or nobody is signed in.
 final class CurrentSeatProvider
     extends $AsyncNotifierProvider<CurrentSeat, SeatTicket?> {
-  /// The seat the app is in, kept on the device so a closed app can go back to
-  /// it. Null when it isn't in one.
+  /// The seat the signed-in player is in, kept on the device so a closed app can
+  /// go back to it. Null when they aren't in one, or nobody is signed in.
   CurrentSeatProvider._()
     : super(
         from: null,
@@ -81,10 +81,10 @@ final class CurrentSeatProvider
   CurrentSeat create() => CurrentSeat();
 }
 
-String _$currentSeatHash() => r'c6f88884e20a8451ccbac3d1176fa713fb56363d';
+String _$currentSeatHash() => r'b3361573d41b26bc7b4704ef4aef8ec0c8511bde';
 
-/// The seat the app is in, kept on the device so a closed app can go back to
-/// it. Null when it isn't in one.
+/// The seat the signed-in player is in, kept on the device so a closed app can
+/// go back to it. Null when they aren't in one, or nobody is signed in.
 
 abstract class _$CurrentSeat extends $AsyncNotifier<SeatTicket?> {
   FutureOr<SeatTicket?> build();
@@ -347,3 +347,145 @@ final class ServerClockOffsetProvider extends $FunctionalProvider<int, int, int>
 }
 
 String _$serverClockOffsetHash() => r'fc2d621fbdba2fe446e1c293bae8b1cd04f1246a';
+
+/// Whether the player can act in the game now: the relay is in it (`live`),
+/// and this app is connected to the relay. While the relay is joining or has
+/// lost the game, or this app is reconnecting, intents would only be refused.
+
+@ProviderFor(seatInteractive)
+final seatInteractiveProvider = SeatInteractiveProvider._();
+
+/// Whether the player can act in the game now: the relay is in it (`live`),
+/// and this app is connected to the relay. While the relay is joining or has
+/// lost the game, or this app is reconnecting, intents would only be refused.
+
+final class SeatInteractiveProvider
+    extends $FunctionalProvider<bool, bool, bool>
+    with $Provider<bool> {
+  /// Whether the player can act in the game now: the relay is in it (`live`),
+  /// and this app is connected to the relay. While the relay is joining or has
+  /// lost the game, or this app is reconnecting, intents would only be refused.
+  SeatInteractiveProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'seatInteractiveProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$seatInteractiveHash();
+
+  @$internal
+  @override
+  $ProviderElement<bool> $createElement($ProviderPointer pointer) =>
+      $ProviderElement(pointer);
+
+  @override
+  bool create(Ref ref) {
+    return seatInteractive(ref);
+  }
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(bool value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<bool>(value),
+    );
+  }
+}
+
+String _$seatInteractiveHash() => r'96cbfd872aae9e310d7afb7bab4fa63759f2fcf1';
+
+/// Intents sent and not yet shown by a snapshot, by a key each screen picks
+/// ("answer", "judge:3"), with the value sent where a screen shows it ahead of
+/// the relay (a mark, an option).
+///
+/// A button with its intent here shows it is waiting rather than taking a
+/// second press: an answer tapped twice used to come back "You already
+/// answered". A refusal clears the key at once; an acceptance clears it with
+/// the next snapshot, which is what shows the change, or after
+/// [settleAfter] for an intent that changed nothing and so brings none.
+
+@ProviderFor(PendingIntents)
+final pendingIntentsProvider = PendingIntentsProvider._();
+
+/// Intents sent and not yet shown by a snapshot, by a key each screen picks
+/// ("answer", "judge:3"), with the value sent where a screen shows it ahead of
+/// the relay (a mark, an option).
+///
+/// A button with its intent here shows it is waiting rather than taking a
+/// second press: an answer tapped twice used to come back "You already
+/// answered". A refusal clears the key at once; an acceptance clears it with
+/// the next snapshot, which is what shows the change, or after
+/// [settleAfter] for an intent that changed nothing and so brings none.
+final class PendingIntentsProvider
+    extends $NotifierProvider<PendingIntents, Map<String, Object?>> {
+  /// Intents sent and not yet shown by a snapshot, by a key each screen picks
+  /// ("answer", "judge:3"), with the value sent where a screen shows it ahead of
+  /// the relay (a mark, an option).
+  ///
+  /// A button with its intent here shows it is waiting rather than taking a
+  /// second press: an answer tapped twice used to come back "You already
+  /// answered". A refusal clears the key at once; an acceptance clears it with
+  /// the next snapshot, which is what shows the change, or after
+  /// [settleAfter] for an intent that changed nothing and so brings none.
+  PendingIntentsProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'pendingIntentsProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$pendingIntentsHash();
+
+  @$internal
+  @override
+  PendingIntents create() => PendingIntents();
+
+  /// {@macro riverpod.override_with_value}
+  Override overrideWithValue(Map<String, Object?> value) {
+    return $ProviderOverride(
+      origin: this,
+      providerOverride: $SyncValueProvider<Map<String, Object?>>(value),
+    );
+  }
+}
+
+String _$pendingIntentsHash() => r'a83182dcec8c878aa6b20f1fbb9485c986b62ab9';
+
+/// Intents sent and not yet shown by a snapshot, by a key each screen picks
+/// ("answer", "judge:3"), with the value sent where a screen shows it ahead of
+/// the relay (a mark, an option).
+///
+/// A button with its intent here shows it is waiting rather than taking a
+/// second press: an answer tapped twice used to come back "You already
+/// answered". A refusal clears the key at once; an acceptance clears it with
+/// the next snapshot, which is what shows the change, or after
+/// [settleAfter] for an intent that changed nothing and so brings none.
+
+abstract class _$PendingIntents extends $Notifier<Map<String, Object?>> {
+  Map<String, Object?> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<Map<String, Object?>, Map<String, Object?>>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<Map<String, Object?>, Map<String, Object?>>,
+              Map<String, Object?>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "status": "live",
+  "options": {
+    "questions_per_game": 5,
+    "question_seconds": 15
+  },
+  "notice": {
+    "message": "Games will pause for a few minutes at 3:00 UTC.",
+    "level": "warn",
+    "title": "Scheduled maintenance",
+    "until": 1790000008000,
+    "kind": "server"
+  },
+  "deadline": null,
+  "final": null,
+  "phase": "lobby",
+  "protocol_version": 1,
+  "question": null,
+  "rounds": [],
+  "game_code": "624949",
+  "players": [
+    {
+      "connected": true,
+      "name": "Hosta",
+      "host": true,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 1,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    },
+    {
+      "connected": true,
+      "name": "Joiner",
+      "host": false,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 2,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    }
+  ],
+  "reveal": null,
+  "pack": {
+    "id": 156070,
+    "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "description": " ممنوع تكتب اسمين",
+    "image_url": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+    "has_images": false,
+    "num_questions": 169
+  },
+  "countdown": null,
+  "chat": {
+    "messages": [],
+    "open": false,
+    "loading": false,
+    "unread": 0,
+    "typing": [],
+    "has_more": false
+  },
+  "reactions": [],
+  "pack_votes": [],
+  "protocol_minor": 3,
+  "server_time": 1790000000000,
+  "you": {
+    "host": false,
+    "poppers": null,
+    "judged": false,
+    "reported": false,
+    "played_again": false,
+    "peer_id": 2,
+    "judgements": {},
+    "answer": null,
+    "wager_choices": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "rating": 0,
+    "can_rate": false,
+    "can_reveal": false,
+    "spectating": false
+  }
+}

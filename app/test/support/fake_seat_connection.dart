@@ -19,6 +19,12 @@ class FakeSeatConnection implements SeatConnection {
   /// Thrown by the next intent, if set.
   GameError? intentError;
 
+  /// While set and not complete, [leave] waits on it, as a slow relay would.
+  Completer<void>? holdLeave;
+
+  /// While set and not complete, every intent waits on it before answering.
+  Completer<void>? holdIntents;
+
   void emit(SeatState state) => _state.add(state);
   void emitStatus(ConnectionStatus status) => _status.add(status);
 
@@ -33,6 +39,8 @@ class FakeSeatConnection implements SeatConnection {
 
   Future<void> _record(String call) async {
     calls.add(call);
+    final hold = holdIntents;
+    if (hold != null && !call.startsWith('attach')) await hold.future;
     final error = intentError;
     intentError = null;
     if (error != null) throw error;
@@ -51,11 +59,18 @@ class FakeSeatConnection implements SeatConnection {
   @override
   Future<void> finalWager(int amount) => _record('final_wager:$amount');
   @override
+  Future<void> rate(int rating) => _record('rate:$rating');
+  @override
+  Future<void> report(String reason) => _record('report:$reason');
+  @override
+  Future<void> packVote(int packId, {required bool vote}) =>
+      _record('pack_vote:$packId:$vote');
+  @override
   Future<void> start() => _record('start');
   @override
   Future<void> options(HostOptions options) => _record(
     'options:${options.questionsPerGame}:${options.questionSeconds}:'
-    '${options.audience.name}',
+    '${options.audience.name}:${options.spectate}',
   );
   @override
   Future<void> reveal() => _record('reveal');
@@ -67,10 +82,33 @@ class FakeSeatConnection implements SeatConnection {
   @override
   Future<void> next() => _record('next');
   @override
+  Future<void> remove(int peerId, {required bool ban, String? bypassToken}) =>
+      _record('remove:$peerId:$ban');
+  @override
+  Future<void> makeHost(int peerId) => _record('make_host:$peerId');
+  @override
+  Future<void> claimHost(String bypassToken) => _record('claim_host');
+  @override
+  Future<void> toLobby() => _record('to_lobby');
+  @override
   Future<void> playAgain() => _record('play_again');
+  @override
+  Future<void> chatOpen() => _record('chat_open');
+  @override
+  Future<void> chatClose() => _record('chat_close');
+  @override
+  Future<void> chatSend(String text) => _record('chat_send:$text');
+  @override
+  Future<void> chatTyping(bool typing) => _record('chat_typing:$typing');
+  @override
+  Future<void> chatMore() => _record('chat_more');
+  @override
+  Future<void> react(int peerId, {String type = 'goose'}) =>
+      _record('react:$peerId:$type');
   @override
   Future<void> leave() async {
     calls.add('leave');
+    await holdLeave?.future;
     if (!closedCompleter.isCompleted) {
       closedCompleter.complete(SeatClosedReason.left);
     }

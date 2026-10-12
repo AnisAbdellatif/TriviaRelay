@@ -1,12 +1,16 @@
 name: trivia_relay
 description: "Trivia Relay: plays Sporcle Party games through a relay that keeps your place when your phone drops. Android and Web."
 publish_to: 'none'
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ^3.13.2
 
 dependencies:
+  # Game sounds (core/sound/, assets/sounds/). Plays short clips on Android through
+  # its own MediaPlayer/SoundPool and on the web through <audio>, with no media
+  # framework behind it: just_audio would bring ExoPlayer for five blips.
+  audioplayers: ^6.8.1
   flutter:
     sdk: flutter
   flutter_riverpod: ^3.4.3
@@ -19,7 +23,12 @@ dependencies:
   # Android-only in practice: handing the APK download off to the browser is the
   # whole of the update install step (core/update/). The web build never calls it.
   url_launcher: ^6.3.2
-  # Web-only: the origin the web app was served from (core/providers/served_origin_web.dart).
+  # The screen stays on while a game is open (features/game/game_effects.dart), as
+  # the official app keeps it: Android's window flag, the Screen Wake Lock API on the
+  # web.
+  wakelock_plus: ^1.8.0
+  # Web-only: the origin the web app was served from (core/providers/served_origin_web.dart),
+  # the address an invite link opened, and the browser's share sheet.
   web: ^1.1.1
 
 dev_dependencies:
@@ -30,9 +39,16 @@ dev_dependencies:
   riverpod_generator: ^4.0.9
   freezed: ^4.0.1
   json_serializable: ^6.14.1
+  # Already in the tree through phoenix_socket; the connection's tests stand in
+  # for the relay's socket with it.
+  web_socket_channel: ^3.0.3
 
 flutter:
   uses-material-design: true
+
+  # Made by scripts/make_sounds.py from plain tones: nobody else's audio.
+  assets:
+    - assets/sounds/
 
   # Bundled, not fetched: google_fonts downloads these from fonts.gstatic.com at
   # runtime and silently falls back to system fonts whenever that fails. Shipping

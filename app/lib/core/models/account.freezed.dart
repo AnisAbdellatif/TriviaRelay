@@ -16,7 +16,9 @@ T _$identity<T>(T value) => value;
 /// @nodoc
 mixin _$SporcleAccount {
 
- String get playerId; String get token; String get handle; String get deviceId;
+ String get playerId; String get token; String get handle; String get deviceId;/// The name other players see in a game, when the player chose one; else
+/// they see [handle] (protocol/PROTOCOL.md §3).
+ String? get displayName;
 /// Create a copy of SporcleAccount
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -30,20 +32,20 @@ $SporcleAccountCopyWith<SporcleAccount> get copyWith => _$SporcleAccountCopyWith
 @override
 bool operator ==(Object other) {
   final _this = this as SporcleAccount;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SporcleAccount&&(identical(other.playerId, _this.playerId) || other.playerId == _this.playerId)&&(identical(other.token, _this.token) || other.token == _this.token)&&(identical(other.handle, _this.handle) || other.handle == _this.handle)&&(identical(other.deviceId, _this.deviceId) || other.deviceId == _this.deviceId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SporcleAccount&&(identical(other.playerId, _this.playerId) || other.playerId == _this.playerId)&&(identical(other.token, _this.token) || other.token == _this.token)&&(identical(other.handle, _this.handle) || other.handle == _this.handle)&&(identical(other.deviceId, _this.deviceId) || other.deviceId == _this.deviceId)&&(identical(other.displayName, _this.displayName) || other.displayName == _this.displayName));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as SporcleAccount;
-  return Object.hash(runtimeType,_this.playerId,_this.token,_this.handle,_this.deviceId);
+  return Object.hash(runtimeType,_this.playerId,_this.token,_this.handle,_this.deviceId,_this.displayName);
 }
 
 @override
 String toString() {
   final _this = this as SporcleAccount;
-  return 'SporcleAccount(playerId: ${_this.playerId}, token: ${_this.token}, handle: ${_this.handle}, deviceId: ${_this.deviceId})';
+  return 'SporcleAccount(playerId: ${_this.playerId}, token: ${_this.token}, handle: ${_this.handle}, deviceId: ${_this.deviceId}, displayName: ${_this.displayName})';
 }
 
 
@@ -54,7 +56,7 @@ abstract mixin class $SporcleAccountCopyWith<$Res>  {
   factory $SporcleAccountCopyWith(SporcleAccount value, $Res Function(SporcleAccount) _then) = _$SporcleAccountCopyWithImpl;
 @useResult
 $Res call({
- String playerId, String token, String handle, String deviceId
+ String playerId, String token, String handle, String deviceId, String? displayName
 });
 
 
@@ -71,13 +73,14 @@ class _$SporcleAccountCopyWithImpl<$Res>
 
 /// Create a copy of SporcleAccount
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? playerId = null,Object? token = null,Object? handle = null,Object? deviceId = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? playerId = null,Object? token = null,Object? handle = null,Object? deviceId = null,Object? displayName = freezed,}) {
   return _then(SporcleAccount(
 playerId: null == playerId ? _self.playerId : playerId // ignore: cast_nullable_to_non_nullable
 as String,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
 as String,handle: null == handle ? _self.handle : handle // ignore: cast_nullable_to_non_nullable
 as String,deviceId: null == deviceId ? _self.deviceId : deviceId // ignore: cast_nullable_to_non_nullable
-as String,
+as String,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -162,10 +165,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String playerId,  String token,  String handle,  String deviceId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String playerId,  String token,  String handle,  String deviceId,  String? displayName)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SporcleAccount() when $default != null:
-return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
+return $default(_that.playerId,_that.token,_that.handle,_that.deviceId,_that.displayName);case _:
   return orElse();
 
 }
@@ -183,10 +186,10 @@ return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String playerId,  String token,  String handle,  String deviceId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String playerId,  String token,  String handle,  String deviceId,  String? displayName)  $default,) {final _that = this;
 switch (_that) {
 case _SporcleAccount():
-return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
+return $default(_that.playerId,_that.token,_that.handle,_that.deviceId,_that.displayName);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -203,10 +206,10 @@ return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String playerId,  String token,  String handle,  String deviceId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String playerId,  String token,  String handle,  String deviceId,  String? displayName)?  $default,) {final _that = this;
 switch (_that) {
 case _SporcleAccount() when $default != null:
-return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
+return $default(_that.playerId,_that.token,_that.handle,_that.deviceId,_that.displayName);case _:
   return null;
 
 }
@@ -218,13 +221,16 @@ return $default(_that.playerId,_that.token,_that.handle,_that.deviceId);case _:
 @JsonSerializable()
 
 class _SporcleAccount extends SporcleAccount {
-  const _SporcleAccount({required this.playerId, required this.token, required this.handle, required this.deviceId}): super._();
+  const _SporcleAccount({required this.playerId, required this.token, required this.handle, required this.deviceId, this.displayName}): super._();
   factory _SporcleAccount.fromJson(Map<String, dynamic> json) => _$SporcleAccountFromJson(json);
 
 @override final  String playerId;
 @override final  String token;
 @override final  String handle;
 @override final  String deviceId;
+/// The name other players see in a game, when the player chose one; else
+/// they see [handle] (protocol/PROTOCOL.md §3).
+@override final  String? displayName;
 
 /// Create a copy of SporcleAccount
 /// with the given fields replaced by the non-null parameter values.
@@ -239,18 +245,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SporcleAccount&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.token, token) || other.token == token)&&(identical(other.handle, handle) || other.handle == handle)&&(identical(other.deviceId, deviceId) || other.deviceId == deviceId));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SporcleAccount&&(identical(other.playerId, playerId) || other.playerId == playerId)&&(identical(other.token, token) || other.token == token)&&(identical(other.handle, handle) || other.handle == handle)&&(identical(other.deviceId, deviceId) || other.deviceId == deviceId)&&(identical(other.displayName, displayName) || other.displayName == displayName));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,playerId,token,handle,deviceId);
+    return Object.hash(runtimeType,playerId,token,handle,deviceId,displayName);
 }
 
 @override
 String toString() {
-    return 'SporcleAccount(playerId: $playerId, token: $token, handle: $handle, deviceId: $deviceId)';
+    return 'SporcleAccount(playerId: $playerId, token: $token, handle: $handle, deviceId: $deviceId, displayName: $displayName)';
 }
 
 
@@ -261,7 +267,7 @@ abstract mixin class _$SporcleAccountCopyWith<$Res> implements $SporcleAccountCo
   factory _$SporcleAccountCopyWith(_SporcleAccount value, $Res Function(_SporcleAccount) _then) = __$SporcleAccountCopyWithImpl;
 @override @useResult
 $Res call({
- String playerId, String token, String handle, String deviceId
+ String playerId, String token, String handle, String deviceId, String? displayName
 });
 
 
@@ -278,13 +284,14 @@ class __$SporcleAccountCopyWithImpl<$Res>
 
 /// Create a copy of SporcleAccount
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? playerId = null,Object? token = null,Object? handle = null,Object? deviceId = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? playerId = null,Object? token = null,Object? handle = null,Object? deviceId = null,Object? displayName = freezed,}) {
   return _then(_SporcleAccount(
 playerId: null == playerId ? _self.playerId : playerId // ignore: cast_nullable_to_non_nullable
 as String,token: null == token ? _self.token : token // ignore: cast_nullable_to_non_nullable
 as String,handle: null == handle ? _self.handle : handle // ignore: cast_nullable_to_non_nullable
 as String,deviceId: null == deviceId ? _self.deviceId : deviceId // ignore: cast_nullable_to_non_nullable
-as String,
+as String,displayName: freezed == displayName ? _self.displayName : displayName // ignore: cast_nullable_to_non_nullable
+as String?,
   ));
 }
 
@@ -295,7 +302,9 @@ as String,
 /// @nodoc
 mixin _$SeatTicket {
 
- String get seatId; String get seatToken; String get gameCode;
+ String get seatId; String get seatToken; String get gameCode;/// The Party Poppers Sporcle said the player had as they took the seat,
+/// when it said (protocol/PROTOCOL.md §3.5).
+ int? get poppers;
 /// Create a copy of SeatTicket
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -309,20 +318,20 @@ $SeatTicketCopyWith<SeatTicket> get copyWith => _$SeatTicketCopyWithImpl<SeatTic
 @override
 bool operator ==(Object other) {
   final _this = this as SeatTicket;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is SeatTicket&&(identical(other.seatId, _this.seatId) || other.seatId == _this.seatId)&&(identical(other.seatToken, _this.seatToken) || other.seatToken == _this.seatToken)&&(identical(other.gameCode, _this.gameCode) || other.gameCode == _this.gameCode));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is SeatTicket&&(identical(other.seatId, _this.seatId) || other.seatId == _this.seatId)&&(identical(other.seatToken, _this.seatToken) || other.seatToken == _this.seatToken)&&(identical(other.gameCode, _this.gameCode) || other.gameCode == _this.gameCode)&&(identical(other.poppers, _this.poppers) || other.poppers == _this.poppers));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as SeatTicket;
-  return Object.hash(runtimeType,_this.seatId,_this.seatToken,_this.gameCode);
+  return Object.hash(runtimeType,_this.seatId,_this.seatToken,_this.gameCode,_this.poppers);
 }
 
 @override
 String toString() {
   final _this = this as SeatTicket;
-  return 'SeatTicket(seatId: ${_this.seatId}, seatToken: ${_this.seatToken}, gameCode: ${_this.gameCode})';
+  return 'SeatTicket(seatId: ${_this.seatId}, seatToken: ${_this.seatToken}, gameCode: ${_this.gameCode}, poppers: ${_this.poppers})';
 }
 
 
@@ -333,7 +342,7 @@ abstract mixin class $SeatTicketCopyWith<$Res>  {
   factory $SeatTicketCopyWith(SeatTicket value, $Res Function(SeatTicket) _then) = _$SeatTicketCopyWithImpl;
 @useResult
 $Res call({
- String seatId, String seatToken, String gameCode
+ String seatId, String seatToken, String gameCode, int? poppers
 });
 
 
@@ -350,12 +359,13 @@ class _$SeatTicketCopyWithImpl<$Res>
 
 /// Create a copy of SeatTicket
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? seatId = null,Object? seatToken = null,Object? gameCode = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? seatId = null,Object? seatToken = null,Object? gameCode = null,Object? poppers = freezed,}) {
   return _then(SeatTicket(
 seatId: null == seatId ? _self.seatId : seatId // ignore: cast_nullable_to_non_nullable
 as String,seatToken: null == seatToken ? _self.seatToken : seatToken // ignore: cast_nullable_to_non_nullable
 as String,gameCode: null == gameCode ? _self.gameCode : gameCode // ignore: cast_nullable_to_non_nullable
-as String,
+as String,poppers: freezed == poppers ? _self.poppers : poppers // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -440,10 +450,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String seatId,  String seatToken,  String gameCode)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String seatId,  String seatToken,  String gameCode,  int? poppers)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _SeatTicket() when $default != null:
-return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
+return $default(_that.seatId,_that.seatToken,_that.gameCode,_that.poppers);case _:
   return orElse();
 
 }
@@ -461,10 +471,10 @@ return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String seatId,  String seatToken,  String gameCode)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String seatId,  String seatToken,  String gameCode,  int? poppers)  $default,) {final _that = this;
 switch (_that) {
 case _SeatTicket():
-return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
+return $default(_that.seatId,_that.seatToken,_that.gameCode,_that.poppers);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -481,10 +491,10 @@ return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String seatId,  String seatToken,  String gameCode)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String seatId,  String seatToken,  String gameCode,  int? poppers)?  $default,) {final _that = this;
 switch (_that) {
 case _SeatTicket() when $default != null:
-return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
+return $default(_that.seatId,_that.seatToken,_that.gameCode,_that.poppers);case _:
   return null;
 
 }
@@ -496,12 +506,15 @@ return $default(_that.seatId,_that.seatToken,_that.gameCode);case _:
 @JsonSerializable()
 
 class _SeatTicket implements SeatTicket {
-  const _SeatTicket({required this.seatId, required this.seatToken, required this.gameCode});
+  const _SeatTicket({required this.seatId, required this.seatToken, required this.gameCode, this.poppers});
   factory _SeatTicket.fromJson(Map<String, dynamic> json) => _$SeatTicketFromJson(json);
 
 @override final  String seatId;
 @override final  String seatToken;
 @override final  String gameCode;
+/// The Party Poppers Sporcle said the player had as they took the seat,
+/// when it said (protocol/PROTOCOL.md §3.5).
+@override final  int? poppers;
 
 /// Create a copy of SeatTicket
 /// with the given fields replaced by the non-null parameter values.
@@ -516,18 +529,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SeatTicket&&(identical(other.seatId, seatId) || other.seatId == seatId)&&(identical(other.seatToken, seatToken) || other.seatToken == seatToken)&&(identical(other.gameCode, gameCode) || other.gameCode == gameCode));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _SeatTicket&&(identical(other.seatId, seatId) || other.seatId == seatId)&&(identical(other.seatToken, seatToken) || other.seatToken == seatToken)&&(identical(other.gameCode, gameCode) || other.gameCode == gameCode)&&(identical(other.poppers, poppers) || other.poppers == poppers));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,seatId,seatToken,gameCode);
+    return Object.hash(runtimeType,seatId,seatToken,gameCode,poppers);
 }
 
 @override
 String toString() {
-    return 'SeatTicket(seatId: $seatId, seatToken: $seatToken, gameCode: $gameCode)';
+    return 'SeatTicket(seatId: $seatId, seatToken: $seatToken, gameCode: $gameCode, poppers: $poppers)';
 }
 
 
@@ -538,7 +551,7 @@ abstract mixin class _$SeatTicketCopyWith<$Res> implements $SeatTicketCopyWith<$
   factory _$SeatTicketCopyWith(_SeatTicket value, $Res Function(_SeatTicket) _then) = __$SeatTicketCopyWithImpl;
 @override @useResult
 $Res call({
- String seatId, String seatToken, String gameCode
+ String seatId, String seatToken, String gameCode, int? poppers
 });
 
 
@@ -555,12 +568,13 @@ class __$SeatTicketCopyWithImpl<$Res>
 
 /// Create a copy of SeatTicket
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? seatId = null,Object? seatToken = null,Object? gameCode = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? seatId = null,Object? seatToken = null,Object? gameCode = null,Object? poppers = freezed,}) {
   return _then(_SeatTicket(
 seatId: null == seatId ? _self.seatId : seatId // ignore: cast_nullable_to_non_nullable
 as String,seatToken: null == seatToken ? _self.seatToken : seatToken // ignore: cast_nullable_to_non_nullable
 as String,gameCode: null == gameCode ? _self.gameCode : gameCode // ignore: cast_nullable_to_non_nullable
-as String,
+as String,poppers: freezed == poppers ? _self.poppers : poppers // ignore: cast_nullable_to_non_nullable
+as int?,
   ));
 }
 
@@ -571,7 +585,9 @@ as String,
 /// @nodoc
 mixin _$PackSummary {
 
- int get id; String get name; String? get description; String? get imageUrl; int? get numQuestions; bool get hasImages; int? get playCount;
+ int get id; String get name; String? get description; String? get imageUrl; int? get numQuestions; bool get hasImages; int? get playCount;/// Whether this player bookmarked it, or null when the relay can't say.
+ bool? get bookmarked;/// Whether this player is told when somebody hosts it, or null.
+ bool? get subscribed;
 /// Create a copy of PackSummary
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -585,20 +601,20 @@ $PackSummaryCopyWith<PackSummary> get copyWith => _$PackSummaryCopyWithImpl<Pack
 @override
 bool operator ==(Object other) {
   final _this = this as PackSummary;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is PackSummary&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.imageUrl, _this.imageUrl) || other.imageUrl == _this.imageUrl)&&(identical(other.numQuestions, _this.numQuestions) || other.numQuestions == _this.numQuestions)&&(identical(other.hasImages, _this.hasImages) || other.hasImages == _this.hasImages)&&(identical(other.playCount, _this.playCount) || other.playCount == _this.playCount));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is PackSummary&&(identical(other.id, _this.id) || other.id == _this.id)&&(identical(other.name, _this.name) || other.name == _this.name)&&(identical(other.description, _this.description) || other.description == _this.description)&&(identical(other.imageUrl, _this.imageUrl) || other.imageUrl == _this.imageUrl)&&(identical(other.numQuestions, _this.numQuestions) || other.numQuestions == _this.numQuestions)&&(identical(other.hasImages, _this.hasImages) || other.hasImages == _this.hasImages)&&(identical(other.playCount, _this.playCount) || other.playCount == _this.playCount)&&(identical(other.bookmarked, _this.bookmarked) || other.bookmarked == _this.bookmarked)&&(identical(other.subscribed, _this.subscribed) || other.subscribed == _this.subscribed));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as PackSummary;
-  return Object.hash(runtimeType,_this.id,_this.name,_this.description,_this.imageUrl,_this.numQuestions,_this.hasImages,_this.playCount);
+  return Object.hash(runtimeType,_this.id,_this.name,_this.description,_this.imageUrl,_this.numQuestions,_this.hasImages,_this.playCount,_this.bookmarked,_this.subscribed);
 }
 
 @override
 String toString() {
   final _this = this as PackSummary;
-  return 'PackSummary(id: ${_this.id}, name: ${_this.name}, description: ${_this.description}, imageUrl: ${_this.imageUrl}, numQuestions: ${_this.numQuestions}, hasImages: ${_this.hasImages}, playCount: ${_this.playCount})';
+  return 'PackSummary(id: ${_this.id}, name: ${_this.name}, description: ${_this.description}, imageUrl: ${_this.imageUrl}, numQuestions: ${_this.numQuestions}, hasImages: ${_this.hasImages}, playCount: ${_this.playCount}, bookmarked: ${_this.bookmarked}, subscribed: ${_this.subscribed})';
 }
 
 
@@ -609,7 +625,7 @@ abstract mixin class $PackSummaryCopyWith<$Res>  {
   factory $PackSummaryCopyWith(PackSummary value, $Res Function(PackSummary) _then) = _$PackSummaryCopyWithImpl;
 @useResult
 $Res call({
- int id, String name, String? description, String? imageUrl, int? numQuestions, bool hasImages, int? playCount
+ int id, String name, String? description, String? imageUrl, int? numQuestions, bool hasImages, int? playCount, bool? bookmarked, bool? subscribed
 });
 
 
@@ -626,7 +642,7 @@ class _$PackSummaryCopyWithImpl<$Res>
 
 /// Create a copy of PackSummary
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? description = freezed,Object? imageUrl = freezed,Object? numQuestions = freezed,Object? hasImages = null,Object? playCount = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? description = freezed,Object? imageUrl = freezed,Object? numQuestions = freezed,Object? hasImages = null,Object? playCount = freezed,Object? bookmarked = freezed,Object? subscribed = freezed,}) {
   return _then(PackSummary(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -635,7 +651,9 @@ as String?,imageUrl: freezed == imageUrl ? _self.imageUrl : imageUrl // ignore: 
 as String?,numQuestions: freezed == numQuestions ? _self.numQuestions : numQuestions // ignore: cast_nullable_to_non_nullable
 as int?,hasImages: null == hasImages ? _self.hasImages : hasImages // ignore: cast_nullable_to_non_nullable
 as bool,playCount: freezed == playCount ? _self.playCount : playCount // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,bookmarked: freezed == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool?,subscribed: freezed == subscribed ? _self.subscribed : subscribed // ignore: cast_nullable_to_non_nullable
+as bool?,
   ));
 }
 
@@ -720,10 +738,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount,  bool? bookmarked,  bool? subscribed)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _PackSummary() when $default != null:
-return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount);case _:
+return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount,_that.bookmarked,_that.subscribed);case _:
   return orElse();
 
 }
@@ -741,10 +759,10 @@ return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQu
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount,  bool? bookmarked,  bool? subscribed)  $default,) {final _that = this;
 switch (_that) {
 case _PackSummary():
-return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount);case _:
+return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount,_that.bookmarked,_that.subscribed);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -761,10 +779,10 @@ return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQu
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int id,  String name,  String? description,  String? imageUrl,  int? numQuestions,  bool hasImages,  int? playCount,  bool? bookmarked,  bool? subscribed)?  $default,) {final _that = this;
 switch (_that) {
 case _PackSummary() when $default != null:
-return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount);case _:
+return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQuestions,_that.hasImages,_that.playCount,_that.bookmarked,_that.subscribed);case _:
   return null;
 
 }
@@ -776,7 +794,7 @@ return $default(_that.id,_that.name,_that.description,_that.imageUrl,_that.numQu
 @JsonSerializable()
 
 class _PackSummary implements PackSummary {
-  const _PackSummary({required this.id, required this.name, this.description, this.imageUrl, this.numQuestions, this.hasImages = false, this.playCount});
+  const _PackSummary({required this.id, required this.name, this.description, this.imageUrl, this.numQuestions, this.hasImages = false, this.playCount, this.bookmarked, this.subscribed});
   factory _PackSummary.fromJson(Map<String, dynamic> json) => _$PackSummaryFromJson(json);
 
 @override final  int id;
@@ -786,6 +804,10 @@ class _PackSummary implements PackSummary {
 @override final  int? numQuestions;
 @override@JsonKey() final  bool hasImages;
 @override final  int? playCount;
+/// Whether this player bookmarked it, or null when the relay can't say.
+@override final  bool? bookmarked;
+/// Whether this player is told when somebody hosts it, or null.
+@override final  bool? subscribed;
 
 /// Create a copy of PackSummary
 /// with the given fields replaced by the non-null parameter values.
@@ -800,18 +822,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _PackSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.description, description) || other.description == description)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.numQuestions, numQuestions) || other.numQuestions == numQuestions)&&(identical(other.hasImages, hasImages) || other.hasImages == hasImages)&&(identical(other.playCount, playCount) || other.playCount == playCount));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _PackSummary&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.description, description) || other.description == description)&&(identical(other.imageUrl, imageUrl) || other.imageUrl == imageUrl)&&(identical(other.numQuestions, numQuestions) || other.numQuestions == numQuestions)&&(identical(other.hasImages, hasImages) || other.hasImages == hasImages)&&(identical(other.playCount, playCount) || other.playCount == playCount)&&(identical(other.bookmarked, bookmarked) || other.bookmarked == bookmarked)&&(identical(other.subscribed, subscribed) || other.subscribed == subscribed));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,id,name,description,imageUrl,numQuestions,hasImages,playCount);
+    return Object.hash(runtimeType,id,name,description,imageUrl,numQuestions,hasImages,playCount,bookmarked,subscribed);
 }
 
 @override
 String toString() {
-    return 'PackSummary(id: $id, name: $name, description: $description, imageUrl: $imageUrl, numQuestions: $numQuestions, hasImages: $hasImages, playCount: $playCount)';
+    return 'PackSummary(id: $id, name: $name, description: $description, imageUrl: $imageUrl, numQuestions: $numQuestions, hasImages: $hasImages, playCount: $playCount, bookmarked: $bookmarked, subscribed: $subscribed)';
 }
 
 
@@ -822,7 +844,7 @@ abstract mixin class _$PackSummaryCopyWith<$Res> implements $PackSummaryCopyWith
   factory _$PackSummaryCopyWith(_PackSummary value, $Res Function(_PackSummary) _then) = __$PackSummaryCopyWithImpl;
 @override @useResult
 $Res call({
- int id, String name, String? description, String? imageUrl, int? numQuestions, bool hasImages, int? playCount
+ int id, String name, String? description, String? imageUrl, int? numQuestions, bool hasImages, int? playCount, bool? bookmarked, bool? subscribed
 });
 
 
@@ -839,7 +861,7 @@ class __$PackSummaryCopyWithImpl<$Res>
 
 /// Create a copy of PackSummary
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? description = freezed,Object? imageUrl = freezed,Object? numQuestions = freezed,Object? hasImages = null,Object? playCount = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? description = freezed,Object? imageUrl = freezed,Object? numQuestions = freezed,Object? hasImages = null,Object? playCount = freezed,Object? bookmarked = freezed,Object? subscribed = freezed,}) {
   return _then(_PackSummary(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as int,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -848,7 +870,9 @@ as String?,imageUrl: freezed == imageUrl ? _self.imageUrl : imageUrl // ignore: 
 as String?,numQuestions: freezed == numQuestions ? _self.numQuestions : numQuestions // ignore: cast_nullable_to_non_nullable
 as int?,hasImages: null == hasImages ? _self.hasImages : hasImages // ignore: cast_nullable_to_non_nullable
 as bool,playCount: freezed == playCount ? _self.playCount : playCount // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,bookmarked: freezed == bookmarked ? _self.bookmarked : bookmarked // ignore: cast_nullable_to_non_nullable
+as bool?,subscribed: freezed == subscribed ? _self.subscribed : subscribed // ignore: cast_nullable_to_non_nullable
+as bool?,
   ));
 }
 
@@ -859,7 +883,8 @@ as int?,
 /// @nodoc
 mixin _$HostOptions {
 
- int get questionsPerGame; int get questionSeconds; Audience get audience;
+ int get questionsPerGame; int get questionSeconds; Audience get audience;/// Host without playing: run the game, answer nothing (since 1.2).
+ bool get spectate;
 /// Create a copy of HostOptions
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -873,20 +898,20 @@ $HostOptionsCopyWith<HostOptions> get copyWith => _$HostOptionsCopyWithImpl<Host
 @override
 bool operator ==(Object other) {
   final _this = this as HostOptions;
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HostOptions&&(identical(other.questionsPerGame, _this.questionsPerGame) || other.questionsPerGame == _this.questionsPerGame)&&(identical(other.questionSeconds, _this.questionSeconds) || other.questionSeconds == _this.questionSeconds)&&(identical(other.audience, _this.audience) || other.audience == _this.audience));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HostOptions&&(identical(other.questionsPerGame, _this.questionsPerGame) || other.questionsPerGame == _this.questionsPerGame)&&(identical(other.questionSeconds, _this.questionSeconds) || other.questionSeconds == _this.questionSeconds)&&(identical(other.audience, _this.audience) || other.audience == _this.audience)&&(identical(other.spectate, _this.spectate) || other.spectate == _this.spectate));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
   final _this = this as HostOptions;
-  return Object.hash(runtimeType,_this.questionsPerGame,_this.questionSeconds,_this.audience);
+  return Object.hash(runtimeType,_this.questionsPerGame,_this.questionSeconds,_this.audience,_this.spectate);
 }
 
 @override
 String toString() {
   final _this = this as HostOptions;
-  return 'HostOptions(questionsPerGame: ${_this.questionsPerGame}, questionSeconds: ${_this.questionSeconds}, audience: ${_this.audience})';
+  return 'HostOptions(questionsPerGame: ${_this.questionsPerGame}, questionSeconds: ${_this.questionSeconds}, audience: ${_this.audience}, spectate: ${_this.spectate})';
 }
 
 
@@ -897,7 +922,7 @@ abstract mixin class $HostOptionsCopyWith<$Res>  {
   factory $HostOptionsCopyWith(HostOptions value, $Res Function(HostOptions) _then) = _$HostOptionsCopyWithImpl;
 @useResult
 $Res call({
- int questionsPerGame, int questionSeconds, Audience audience
+ int questionsPerGame, int questionSeconds, Audience audience, bool spectate
 });
 
 
@@ -914,12 +939,13 @@ class _$HostOptionsCopyWithImpl<$Res>
 
 /// Create a copy of HostOptions
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? questionsPerGame = null,Object? questionSeconds = null,Object? audience = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? questionsPerGame = null,Object? questionSeconds = null,Object? audience = null,Object? spectate = null,}) {
   return _then(HostOptions(
 questionsPerGame: null == questionsPerGame ? _self.questionsPerGame : questionsPerGame // ignore: cast_nullable_to_non_nullable
 as int,questionSeconds: null == questionSeconds ? _self.questionSeconds : questionSeconds // ignore: cast_nullable_to_non_nullable
 as int,audience: null == audience ? _self.audience : audience // ignore: cast_nullable_to_non_nullable
-as Audience,
+as Audience,spectate: null == spectate ? _self.spectate : spectate // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 
@@ -1004,10 +1030,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int questionsPerGame,  int questionSeconds,  Audience audience)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( int questionsPerGame,  int questionSeconds,  Audience audience,  bool spectate)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _HostOptions() when $default != null:
-return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);case _:
+return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience,_that.spectate);case _:
   return orElse();
 
 }
@@ -1025,10 +1051,10 @@ return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);cas
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int questionsPerGame,  int questionSeconds,  Audience audience)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( int questionsPerGame,  int questionSeconds,  Audience audience,  bool spectate)  $default,) {final _that = this;
 switch (_that) {
 case _HostOptions():
-return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);case _:
+return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience,_that.spectate);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -1045,10 +1071,10 @@ return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);cas
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int questionsPerGame,  int questionSeconds,  Audience audience)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( int questionsPerGame,  int questionSeconds,  Audience audience,  bool spectate)?  $default,) {final _that = this;
 switch (_that) {
 case _HostOptions() when $default != null:
-return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);case _:
+return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience,_that.spectate);case _:
   return null;
 
 }
@@ -1060,12 +1086,14 @@ return $default(_that.questionsPerGame,_that.questionSeconds,_that.audience);cas
 @JsonSerializable()
 
 class _HostOptions implements HostOptions {
-  const _HostOptions({this.questionsPerGame = 10, this.questionSeconds = 30, this.audience = Audience.private});
+  const _HostOptions({this.questionsPerGame = 10, this.questionSeconds = 30, this.audience = Audience.private, this.spectate = false});
   factory _HostOptions.fromJson(Map<String, dynamic> json) => _$HostOptionsFromJson(json);
 
 @override@JsonKey() final  int questionsPerGame;
 @override@JsonKey() final  int questionSeconds;
 @override@JsonKey() final  Audience audience;
+/// Host without playing: run the game, answer nothing (since 1.2).
+@override@JsonKey() final  bool spectate;
 
 /// Create a copy of HostOptions
 /// with the given fields replaced by the non-null parameter values.
@@ -1080,18 +1108,18 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-    return identical(this, other) || (other.runtimeType == runtimeType&&other is _HostOptions&&(identical(other.questionsPerGame, questionsPerGame) || other.questionsPerGame == questionsPerGame)&&(identical(other.questionSeconds, questionSeconds) || other.questionSeconds == questionSeconds)&&(identical(other.audience, audience) || other.audience == audience));
+    return identical(this, other) || (other.runtimeType == runtimeType&&other is _HostOptions&&(identical(other.questionsPerGame, questionsPerGame) || other.questionsPerGame == questionsPerGame)&&(identical(other.questionSeconds, questionSeconds) || other.questionSeconds == questionSeconds)&&(identical(other.audience, audience) || other.audience == audience)&&(identical(other.spectate, spectate) || other.spectate == spectate));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
 int get hashCode {
-    return Object.hash(runtimeType,questionsPerGame,questionSeconds,audience);
+    return Object.hash(runtimeType,questionsPerGame,questionSeconds,audience,spectate);
 }
 
 @override
 String toString() {
-    return 'HostOptions(questionsPerGame: $questionsPerGame, questionSeconds: $questionSeconds, audience: $audience)';
+    return 'HostOptions(questionsPerGame: $questionsPerGame, questionSeconds: $questionSeconds, audience: $audience, spectate: $spectate)';
 }
 
 
@@ -1102,7 +1130,7 @@ abstract mixin class _$HostOptionsCopyWith<$Res> implements $HostOptionsCopyWith
   factory _$HostOptionsCopyWith(_HostOptions value, $Res Function(_HostOptions) _then) = __$HostOptionsCopyWithImpl;
 @override @useResult
 $Res call({
- int questionsPerGame, int questionSeconds, Audience audience
+ int questionsPerGame, int questionSeconds, Audience audience, bool spectate
 });
 
 
@@ -1119,12 +1147,13 @@ class __$HostOptionsCopyWithImpl<$Res>
 
 /// Create a copy of HostOptions
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? questionsPerGame = null,Object? questionSeconds = null,Object? audience = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? questionsPerGame = null,Object? questionSeconds = null,Object? audience = null,Object? spectate = null,}) {
   return _then(_HostOptions(
 questionsPerGame: null == questionsPerGame ? _self.questionsPerGame : questionsPerGame // ignore: cast_nullable_to_non_nullable
 as int,questionSeconds: null == questionSeconds ? _self.questionSeconds : questionSeconds // ignore: cast_nullable_to_non_nullable
 as int,audience: null == audience ? _self.audience : audience // ignore: cast_nullable_to_non_nullable
-as Audience,
+as Audience,spectate: null == spectate ? _self.spectate : spectate // ignore: cast_nullable_to_non_nullable
+as bool,
   ));
 }
 

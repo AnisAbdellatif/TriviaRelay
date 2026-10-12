@@ -47,33 +47,81 @@ defmodule TriviaRelayWeb.Plugs.WebApp do
 
   defp serve(%{path_info: []} = conn, dir), do: conn |> protect() |> send_index(dir)
 
-  defp serve(conn, dir) do
-    Plug.Static.call(
-      protect(conn),
-      Plug.Static.init(
-        at: "/",
-        from: dir,
-        only: @served,
-        only_matching: @served_prefixes,
-        brotli: true,
-        cache_control_for_etags: @cache_control,
-        cache_control_for_vsn_requests: @cache_control
-      )
-    )
+  # An invite link (`/join/<code>`, protocol/PROTOCOL.md §3.8) is the app itself, which
+  # reads the code from its address and offers to join. Only a code as games have them:
+  # anything else under /join is nothing here.
+  defp serve(%{path_info: ["join", code]} = conn, dir) do
+    if invite_code?(code), do: conn |> protect() |> send_index(dir), else: conn
   end
 
-  # No other site may frame the app: a host's controls under somebody else's page are
-  # a click away from moving a game on. A full CSP is left out on
-  # purpose — Flutter's renderer needs `wasm-unsafe-eval` and inline bootstrap, and a
-  # policy loose enough for that buys little — but framing is the one it can refuse.
+  # The page's headers go only on what this serves: the API and /admin set their own.
+  defp serve(conn, dir) do
+    served =
+      Plug.Static.call(
+        protect(conn),
+        Plug.Static.init(
+          at: "/",
+          from: dir,
+          only: @served,
+          only_matching: @served_prefixes,
+          brotli: true,
+          cache_control_for_etags: @cache_control,
+          cache_control_for_vsn_requests: @cache_control
+        )
+      )
+
+    if served.halted, do: served, else: conn
+  end
+
+  # What the page may load, and that no other site may frame it: a host's controls under
+  # somebody else's page are a click away from moving a game on.
+  #
+  # The Flutter app needs, beyond its own files (index.html loads flutter_bootstrap.js
+  # from a file; there is no inline script):
+  #   * `wasm-unsafe-eval`, to compile CanvasKit's WebAssembly (served locally,
+  #     `--no-web-resources-cdn`);
+  #   * inline styles: the engine writes its own <style> elements;
+  #   * images from anywhere over https: pack and question pictures are <img> elements
+  #     straight from Sporcle's hosts, and decoded ones become blob:/data: URLs;
+  #   * fonts.gstatic.com, where the engine fetches Noto fallback fonts for glyphs the
+  #     bundled fonts don't have (emoji, other scripts);
+  #   * its relay: this origin, over https and over its socket (wss:, or ws: in
+  #     development), named outright because older browsers don't count a socket as
+  #     'self'.
   defp protect(conn) do
     Plug.Conn.merge_resp_headers(conn, [
-      {"content-security-policy", "frame-ancestors 'none'"},
+      {"content-security-policy", csp()},
       {"x-frame-options", "DENY"},
       {"x-content-type-options", "nosniff"},
       {"referrer-policy", "no-referrer"}
     ])
   end
+
+  @doc "The page's Content-Security-Policy."
+  def csp do
+    socket = TriviaRelayWeb.Endpoint.url() |> String.replace(~r/^http/, "ws")
+
+    Enum.join(
+      [
+        "default-src 'self'",
+        "script-src 'self' 'wasm-unsafe-eval'",
+        "style-src 'self' 'unsafe-inline'",
+        "img-src 'self' https: data: blob:",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "connect-src 'self' #{socket} https://fonts.gstatic.com",
+        "worker-src 'self' blob:",
+        "manifest-src 'self'",
+        "object-src 'none'",
+        "base-uri 'self'",
+        "form-action 'none'",
+        "frame-ancestors 'none'"
+      ],
+      "; "
+    )
+  end
+
+  @doc "Whether `code` is a game code: 4 to 8 digits."
+  def invite_code?(code), do: is_binary(code) and String.match?(code, ~r/\A\d{4,8}\z/)
 
   # The app is a single page: "/" is the shell.
   defp send_index(conn, dir) do

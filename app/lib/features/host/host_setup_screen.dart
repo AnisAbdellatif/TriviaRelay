@@ -9,6 +9,7 @@ import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import 'pack_browser_screen.dart';
 import 'pack_tile.dart';
+import 'spectate_switch.dart';
 
 /// Choosing a pack from Sporcle's catalog and the game's options, then
 /// creating the game (protocol/PROTOCOL.md §3.3). Invite-only unless the host
@@ -72,7 +73,12 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
               ? 'Choose a pack'
               : 'Create the game',
           trailing: _pack == null ? null : _summary(_options),
-          onPressed: _pack != null && !_creating ? _create : null,
+          busy: _creating,
+          onPressed: _creating
+              ? null
+              : _pack == null
+              ? _choosePack
+              : _create,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -125,6 +131,16 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
                 style: fz.m(12, color: FzColors.ac2),
               ),
             ],
+            const SizedBox(height: 26),
+            const FzEyebrow('Host only'),
+            const SizedBox(height: 4),
+            SpectateSwitch(
+              key: const Key('spectateSwitch'),
+              value: _options.spectate,
+              onChanged: (spectate) => setState(
+                () => _options = _options.copyWith(spectate: spectate),
+              ),
+            ),
             const SizedBox(height: 12),
           ],
         ),
@@ -133,7 +149,8 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
   }
 
   static String _summary(HostOptions o) =>
-      '${o.questionsPerGame} × ${o.questionSeconds}s';
+      '${o.questionsPerGame} × ${o.questionSeconds}s'
+      '${o.spectate ? ' · watching' : ''}';
 }
 
 String audienceLabel(Audience audience) => switch (audience) {
@@ -161,12 +178,11 @@ class _PackChoice extends StatelessWidget {
         trailing: Text('Change', style: fz.m(13, color: FzColors.ac)),
       );
     }
-    return InkWell(
+    return FzTile(
       key: const Key('choosePackButton'),
-      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: FzPanel(
-        borderColor: FzColors.line,
+        borderColor: FzColors.edge,
         padding: const EdgeInsets.all(10),
         child: Row(
           children: [

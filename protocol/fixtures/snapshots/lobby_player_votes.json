@@ -1,0 +1,126 @@
+{
+  "status": "live",
+  "options": {
+    "questions_per_game": 5,
+    "question_seconds": 15
+  },
+  "notice": null,
+  "deadline": null,
+  "final": null,
+  "phase": "lobby",
+  "protocol_version": 1,
+  "question": null,
+  "rounds": [],
+  "game_code": "624949",
+  "players": [
+    {
+      "connected": true,
+      "name": "Hosta",
+      "host": true,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 1,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    },
+    {
+      "connected": true,
+      "name": "Joiner",
+      "host": false,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 2,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    }
+  ],
+  "reveal": null,
+  "pack": {
+    "id": 156070,
+    "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "description": " ممنوع تكتب اسمين",
+    "image_url": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+    "has_images": false,
+    "num_questions": 169
+  },
+  "countdown": null,
+  "chat": {
+    "messages": [],
+    "open": false,
+    "loading": false,
+    "unread": 0,
+    "typing": [],
+    "has_more": false
+  },
+  "reactions": [],
+  "pack_votes": [
+    {
+      "pack": {
+        "id": 268682,
+        "name": "World Capitals",
+        "description": null,
+        "image_url": null,
+        "has_images": false,
+        "num_questions": 50
+      },
+      "voters": [
+        1,
+        2
+      ],
+      "votes": 2,
+      "you": true
+    },
+    {
+      "pack": {
+        "id": 1001,
+        "name": "Flags",
+        "description": null,
+        "image_url": null,
+        "has_images": false,
+        "num_questions": 50
+      },
+      "voters": [
+        1
+      ],
+      "votes": 1,
+      "you": false
+    }
+  ],
+  "protocol_minor": 3,
+  "server_time": 1790000000000,
+  "you": {
+    "host": false,
+    "poppers": null,
+    "judged": false,
+    "reported": false,
+    "played_again": false,
+    "peer_id": 2,
+    "judgements": {},
+    "answer": null,
+    "wager_choices": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "rating": 0,
+    "can_rate": false,
+    "can_reveal": false,
+    "spectating": false
+  }
+}

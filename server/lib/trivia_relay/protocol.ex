@@ -12,7 +12,7 @@ defmodule TriviaRelay.Protocol do
   alias TriviaRelay.Sporcle.Api
 
   @major 1
-  @minor 1
+  @minor 3
 
   def major, do: @major
   def minor, do: @minor

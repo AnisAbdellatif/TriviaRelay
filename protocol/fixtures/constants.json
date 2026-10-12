@@ -1,6 +1,6 @@
 {
   "_comment": "Every fixed number the relay and the app share (PROTOCOL.md). Each side's tests require its own constants to equal this file: change one here and in both.",
-  "protocol_version": "1.1",
+  "protocol_version": "1.3",
   "broadcast_interval_ms": 100,
   "vote_ms": 15000,
   "wager_ms": 30000,
@@ -9,5 +9,17 @@
   "question_seconds": [15, 30, 45, 60],
   "audiences": ["private", "friends", "anyone"],
   "final_votes": ["easy", "medium", "hard"],
-  "pack_lists": ["popular", "fresh", "bookmarked", "created", "friends", "purchased", "free", "all"]
+  "answer_max_length": 80,
+  "question_report_reasons": ["inaccurate", "typo", "offensive"],
+  "max_pack_votes": 5,
+  "start_countdown_ms": 5000,
+  "final_countdown_ms": 3000,
+  "pack_lists": ["popular", "fresh", "bookmarked", "created", "friends", "purchased", "free", "all"],
+  "game_lists": ["invited", "friends", "public"],
+  "pack_report_reasons": ["harassment", "offensive", "spam", "inaccurate", "other"],
+  "chat_max_length": 256,
+  "reaction_types": ["goose"],
+  "reaction_sounds": ["goose", "cow", "donkey", "goat", "rooster", "sheep", "soccer_cheer", "aww", "clap", "ooh", "laugh", "accordion", "rim_shot", "trombone", "trumpet", "tuba"],
+  "reaction_gap_ms": 2000,
+  "reaction_ms": 4000
 }

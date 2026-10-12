@@ -14,42 +14,54 @@ defmodule TriviaRelayWeb.ChannelCase do
 
   alias TriviaRelay.Seats.Seat
 
-  @me "sporcle_id//joinPlayer"
-
   @doc """
   Starts a seat under the seats supervisor with a fake upstream, as `Seats` would after
-  joinGame. Returns `%{id, token, seat, upstream}`.
+  joinGame. Returns `%{id, token, seat, upstream, me}`.
+
+  Each seat is a different player (`:me`) unless the test says otherwise: a player has one
+  seat at a time, and a new one ends the old.
   """
   def start_seat(opts \\ []) do
-    id = "seat" <> Integer.to_string(System.unique_integer([:positive]))
+    unique = Integer.to_string(System.unique_integer([:positive]))
+    id = "seat" <> unique
+    {me, opts} = Keyword.pop(opts, :me, "sporcle_id//joinPlayer" <> unique)
 
     spec =
       {Seat,
-       [
-         id: id,
-         game_code: "624949",
-         me: @me,
-         session: %{
-           "test_pid" => self(),
-           "DnsName" => "x",
-           "Port" => 1,
-           "PlayerSessionId" => "psess-x"
-         },
-         player: %{}
-       ] ++ opts}
+       Keyword.merge(
+         [
+           id: id,
+           game_code: "624949",
+           me: me,
+           session: %{
+             "test_pid" => self(),
+             "DnsName" => "x",
+             "Port" => 1,
+             "PlayerSessionId" => "psess-x"
+           },
+           player: %{}
+         ],
+         opts
+       )}
 
     {:ok, seat} = DynamicSupervisor.start_child(TriviaRelay.Seats.Supervisor, spec)
     upstream = receive do: ({:fake_upstream, pid, ^seat, _} -> pid)
-    %{id: id, token: TriviaRelay.Seats.sign(id), seat: seat, upstream: upstream}
+    %{id: id, token: TriviaRelay.Seats.sign(id), seat: seat, upstream: upstream, me: me}
   end
 
-  @doc "Plays Sporcle's side: the seat's upstream received `event`."
-  def sporcle(seat, event, payload), do: send(seat, {:upstream, "test", {:event, event, payload}})
+  @doc "Plays Sporcle's side: the seat's upstream received `event` from the server (sender -1)."
+  def sporcle(seat, event, payload), do: sporcle(seat, event, payload, -1)
+
+  @doc "As `sporcle/3`, but from `sender` (a peer id for a forged `sendTo`, `-1` for the server)."
+  def sporcle(seat, event, payload, sender),
+    do: send(seat, {:upstream, "test", {:event, event, payload, sender}})
 
   @doc "A lobby with the host (peer 1) and this seat's player (peer 2), five questions of 15 s."
   def lobby(seat) do
+    me = :sys.get_state(seat).state.me
+
     sporcle(seat, "game_info", %{
-      "allPlayers" => [player(1, "sporcle_id//hostPlayer", true), player(2, @me, false)],
+      "allPlayers" => [player(1, "sporcle_id//hostPlayer", true), player(2, me, false)],
       "gameOptions" => %{"QUESTIONS_PER_GAME" => 5, "QUESTION_SECONDS" => 15},
       "gamePack" => %{"id" => 156_070, "name" => "Flags", "num_questions" => 169}
     })

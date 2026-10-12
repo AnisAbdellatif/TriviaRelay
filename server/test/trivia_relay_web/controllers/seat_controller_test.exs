@@ -6,7 +6,7 @@ defmodule TriviaRelayWeb.SeatControllerTest do
   @player %{
     "player_id" => "joinPlayer",
     "token" => "t0k3n",
-    "device_id" => "d3v",
+    "device_id" => "0123456789abcdef",
     "handle" => "Joiner"
   }
 
@@ -97,7 +97,7 @@ defmodule TriviaRelayWeb.SeatControllerTest do
               %{"peerId" => 1, "playerId" => "sporcle_id//joinPlayer", "isHost" => host?},
               %{"peerId" => 2, "playerId" => "sporcle_id//other", "isHost" => not host?}
             ]
-          }}}
+          }, -1}}
       )
 
       token
@@ -125,11 +125,35 @@ defmodule TriviaRelayWeb.SeatControllerTest do
       assert_receive {:sent, "change_pack", %{gamePack: %{"id" => 268_682, "name" => "Capitals"}}}
     end
 
-    test "anybody else is refused", %{conn: conn} do
+    test "anybody else's is a vote for it, as the whole pack", %{conn: conn} do
       token = seated(conn, false)
-      stub(&Req.Test.json(&1, %{"pack" => %{"id" => 268_682}}))
-      assert %{"code" => "not_host"} = json_response(change(conn, token), 409)
+      stub(&Req.Test.json(&1, %{"pack" => %{"id" => 268_682, "name" => "Capitals"}}))
+      assert response(change(conn, token), 204)
+
+      assert_receive {:sent, "vote_on_pack",
+                      %{gamePack: %{"id" => 268_682, "name" => "Capitals"}}}
+
       refute_received {:sent, "change_pack", _}
+    end
+
+    test "a vote past the official app's five is refused", %{conn: conn} do
+      token = seated(conn, false)
+      {:ok, id} = Seats.verify(token)
+      pid = Seats.whereis(id)
+
+      votes =
+        Map.new(1..5, fn id ->
+          {"#{id}",
+           %{
+             "gamePack" => %{"id" => id, "name" => "P#{id}"},
+             "voters" => ["sporcle_id//joinPlayer"]
+           }}
+        end)
+
+      send(pid, {:upstream, "x", {:event, "pack_votes", %{"packVotes" => votes}, -1}})
+      stub(&Req.Test.json(&1, %{"pack" => %{"id" => 268_682, "name" => "Capitals"}}))
+      assert %{"code" => "too_many_votes"} = json_response(change(conn, token), 409)
+      refute_received {:sent, "vote_on_pack", _}
     end
 
     test "a seat token that isn't genuine is refused before Sporcle", %{conn: conn} do
@@ -148,6 +172,52 @@ defmodule TriviaRelayWeb.SeatControllerTest do
     stub(&Req.Test.json(&1, %{"error" => "Game not found"}))
     conn = post(conn, ~p"/api/seats", %{"code" => "624949", "player" => @player})
     assert %{"code" => "game_refused", "message" => "Game not found"} = json_response(conn, 409)
+  end
+
+  test "a refusal with its reason in `denied` passes that on", %{conn: conn} do
+    stub(
+      &Req.Test.json(&1, %{
+        "denied" => %{"code" => "GameFull", "message" => "That party is full."},
+        "popper_count" => 3
+      })
+    )
+
+    conn = post(conn, ~p"/api/seats", %{"code" => "624949", "player" => @player})
+
+    assert %{"code" => "game_refused", "message" => "That party is full."} =
+             json_response(conn, 409)
+  end
+
+  test "a game with pictures and no Party Popper left says so", %{conn: conn} do
+    stub(
+      &Req.Test.json(&1, %{
+        "denied" => %{"code" => "BuyPopper", "message" => nil},
+        "popper_count" => 0
+      })
+    )
+
+    conn = post(conn, ~p"/api/seats", %{"code" => "624949", "player" => @player})
+    assert %{"code" => "insufficient_poppers"} = json_response(conn, 409)
+  end
+
+  test "a seat says how many Party Poppers Sporcle says the player has", %{conn: conn} do
+    session = session()
+    stub(&Req.Test.json(&1, %{"playerSession" => session, "popper_count" => 4}))
+    conn = post(conn, ~p"/api/seats", %{"code" => "624949", "player" => @player})
+    assert %{"poppers" => 4} = json_response(conn, 201)
+  end
+
+  test "the name the player chose is the one others see, the handle stays theirs", %{conn: conn} do
+    session = session()
+    stub(&Req.Test.json(&1, %{"playerSession" => session}))
+    player = Map.put(@player, "name", " Quiz\u202E Wiz ")
+
+    conn = post(conn, ~p"/api/seats", %{"code" => "624949", "player" => player})
+    assert %{"poppers" => nil} = json_response(conn, 201)
+
+    assert_receive {:fake_upstream, _, _, login}
+    assert login["teamName"] == "Quiz Wiz"
+    assert login["sporcleHandle"] == "Joiner"
   end
 
   test "bad requests never reach Sporcle", %{conn: conn} do

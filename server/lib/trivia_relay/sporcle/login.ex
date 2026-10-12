@@ -41,7 +41,8 @@ defmodule TriviaRelay.Sporcle.Login do
   defp prime(device_id) do
     case Http.request(
            method: :get,
-           url: @site <> "/login/?party_udid=" <> URI.encode(device_id),
+           url: @site <> "/login/",
+           params: [party_udid: device_id],
            headers: %{"user-agent" => Identity.user_agent_api()}
          ) do
       {:ok, %{status: 200} = resp} -> {:ok, cookies(resp)}
@@ -76,14 +77,24 @@ defmodule TriviaRelay.Sporcle.Login do
 
   defp from_login(_body, _email), do: {:error, :bad_credentials}
 
-  # Which step failed and why, never with anything the player sent.
+  # Which step failed and why, never with anything the player sent: only the kind of
+  # failure, since an exception or a response could carry the request back with it.
   defp step(_name, {:ok, _} = ok), do: ok
   defp step(_name, {:error, :bad_credentials} = error), do: error
 
   defp step(name, {:error, reason} = error) do
-    Logger.warning("Sporcle login failed at #{name}: #{inspect(reason)}")
+    Logger.warning("Sporcle login failed at #{name}: #{why(reason)}")
     error
   end
+
+  defp why(%{__exception__: true, reason: r} = e) when is_atom(r),
+    do: "#{inspect(e.__struct__)} #{inspect(r)}"
+
+  defp why(%{__exception__: true} = e), do: inspect(e.__struct__)
+
+  defp why({:sporcle, status}) when is_integer(status), do: "HTTP #{status}"
+  defp why(reason) when is_atom(reason), do: inspect(reason)
+  defp why(_reason), do: "unexpected"
 
   defp cookies(resp) do
     resp

@@ -48,6 +48,9 @@ class PhoenixSeatConnection implements SeatConnection {
   bool _joined = false;
   bool _done = false;
 
+  /// [leave] was asked: the channel closing is the leave, not a displacement.
+  bool _leaving = false;
+
   /// `<base>/socket/websocket?vsn=2.0.0` with an http→ws / https→wss scheme.
   static Uri socketUri(String baseUrl) {
     final base = Uri.parse(baseUrl);
@@ -103,7 +106,9 @@ class PhoenixSeatConnection implements SeatConnection {
         parameters: joinPayload(ticket),
       );
       _channel = channel;
-      _subscriptions.add(channel.messages.listen(_onChannelMessage));
+      _subscriptions.add(
+        channel.messages.listen(_onChannelMessage, onDone: _onChannelClosed),
+      );
 
       final PushResponse reply;
       try {
@@ -154,6 +159,16 @@ class PhoenixSeatConnection implements SeatConnection {
       _push('final_wager', {'amount': amount});
 
   @override
+  Future<void> rate(int rating) => _push('rate', {'rating': rating});
+
+  @override
+  Future<void> report(String reason) => _push('report', {'reason': reason});
+
+  @override
+  Future<void> packVote(int packId, {required bool vote}) =>
+      _push('pack_vote', {'pack_id': packId, 'vote': vote});
+
+  @override
   Future<void> start() => _push('start', const {});
 
   @override
@@ -161,6 +176,7 @@ class PhoenixSeatConnection implements SeatConnection {
     'questions_per_game': options.questionsPerGame,
     'question_seconds': options.questionSeconds,
     'audience': options.audience.name,
+    'spectate': options.spectate,
   });
 
   @override
@@ -177,11 +193,50 @@ class PhoenixSeatConnection implements SeatConnection {
   Future<void> next() => _push('next', const {});
 
   @override
+  Future<void> remove(int peerId, {required bool ban, String? bypassToken}) {
+    final payload = <String, dynamic>{'peer_id': peerId, 'ban': ban};
+    if (bypassToken != null) payload['bypass_token'] = bypassToken;
+    return _push('remove', payload);
+  }
+
+  @override
+  Future<void> makeHost(int peerId) => _push('make_host', {'peer_id': peerId});
+
+  @override
+  Future<void> claimHost(String bypassToken) =>
+      _push('claim_host', {'bypass_token': bypassToken});
+
+  @override
+  Future<void> toLobby() => _push('to_lobby', const {});
+
+  @override
   Future<void> playAgain() => _push('play_again', const {});
+
+  @override
+  Future<void> chatOpen() => _push('chat_open', const {});
+
+  @override
+  Future<void> chatClose() => _push('chat_close', const {});
+
+  @override
+  Future<void> chatSend(String text) => _push('chat_send', {'text': text});
+
+  @override
+  Future<void> chatTyping(bool typing) =>
+      _push('chat_typing', {'typing': typing});
+
+  @override
+  Future<void> chatMore() => _push('chat_more', const {});
+
+  @override
+  Future<void> react(int peerId, {String type = 'goose'}) => type == 'goose'
+      ? _push('honk', {'peer_id': peerId})
+      : _push('react', {'peer_id': peerId, 'type': type});
 
   @override
   Future<void> leave() async {
     if (_done) return;
+    _leaving = true;
     if (_joined) {
       try {
         await _push('leave', const {}).timeout(const Duration(seconds: 3));
@@ -242,8 +297,10 @@ class PhoenixSeatConnection implements SeatConnection {
           );
         }
       case 'seat_closed':
-        _completeClosed(_reasonFrom(_asMap(message.payload)['reason']));
+        _completeClosed(reasonFrom(_asMap(message.payload)));
         _shutdown();
+      case 'phx_close':
+        _onChannelClosed();
       default:
         final channel = _channel;
         if (_joined &&
@@ -270,6 +327,15 @@ class PhoenixSeatConnection implements SeatConnection {
       _completeClosed(SeatClosedReason.notFound);
     }
     _shutdown();
+  }
+
+  /// The relay closed the channel with no `seat_closed` first: the seat goes
+  /// on, joined from other apps, and this one was the one let go (§3.3).
+  /// Rejoining would only push another app out, so this connection stops.
+  void _onChannelClosed() {
+    if (_done || _leaving || _closed.isCompleted || !_joined) return;
+    _teardown();
+    _status.add(ConnectionStatus.displaced);
   }
 
   void _onSocketDown() {
@@ -307,12 +373,18 @@ class PhoenixSeatConnection implements SeatConnection {
     );
   }
 
-  static SeatClosedReason _reasonFrom(Object? reason) => switch (reason) {
-    'left' => SeatClosedReason.left,
-    'expired' => SeatClosedReason.expired,
-    'removed' => SeatClosedReason.removed,
-    _ => SeatClosedReason.shutdown,
-  };
+  /// Why the seat ended, from a `seat_closed` payload (§5.2).
+  static SeatClosedReason reasonFrom(Map<String, dynamic> closed) =>
+      switch (closed['reason']) {
+        // `replaced` since 1.2; before it, a moved seat read as left.
+        'left' when closed['replaced'] == true => SeatClosedReason.moved,
+        'left' => SeatClosedReason.left,
+        'expired' => SeatClosedReason.expired,
+        // `can_rejoin` since 1.2; a relay before it didn't say.
+        'removed' when closed['can_rejoin'] == false => SeatClosedReason.kicked,
+        'removed' => SeatClosedReason.removed,
+        _ => SeatClosedReason.shutdown,
+      };
 
   static Map<String, dynamic> _asMap(Object? value) =>
       value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};

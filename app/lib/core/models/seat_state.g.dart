@@ -38,6 +38,25 @@ _SeatState _$SeatStateFromJson(Map<String, dynamic> json) => _SeatState(
   finalRound: json['final'] == null
       ? null
       : FinalRound.fromJson(json['final'] as Map<String, dynamic>),
+  notice: json['notice'] == null
+      ? null
+      : Notice.fromJson(json['notice'] as Map<String, dynamic>),
+  countdown: json['countdown'] == null
+      ? null
+      : StartCountdown.fromJson(json['countdown'] as Map<String, dynamic>),
+  packVotes:
+      (json['pack_votes'] as List<dynamic>?)
+          ?.map((e) => PackVote.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <PackVote>[],
+  chat: json['chat'] == null
+      ? const ChatState()
+      : ChatState.fromJson(json['chat'] as Map<String, dynamic>),
+  reactions:
+      (json['reactions'] as List<dynamic>?)
+          ?.map((e) => Reaction.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <Reaction>[],
 );
 
 Map<String, dynamic> _$SeatStateToJson(_SeatState instance) =>
@@ -57,6 +76,11 @@ Map<String, dynamic> _$SeatStateToJson(_SeatState instance) =>
       'you': instance.you.toJson(),
       'reveal': instance.reveal?.toJson(),
       'final': instance.finalRound?.toJson(),
+      'notice': instance.notice?.toJson(),
+      'countdown': instance.countdown?.toJson(),
+      'pack_votes': instance.packVotes.map((e) => e.toJson()).toList(),
+      'chat': instance.chat.toJson(),
+      'reactions': instance.reactions.map((e) => e.toJson()).toList(),
     };
 
 const _$SeatStatusEnumMap = {
@@ -138,10 +162,15 @@ _PlayerView _$PlayerViewFromJson(Map<String, dynamic> json) => _PlayerView(
   host: json['host'] as bool? ?? false,
   connected: json['connected'] as bool? ?? true,
   ready: json['ready'] as bool? ?? false,
+  readyForNextGame: json['ready_for_next_game'] as bool? ?? false,
+  spectating: json['spectating'] as bool? ?? false,
   score: (json['score'] as num?)?.toInt() ?? 0,
   answered: json['answered'] as bool? ?? false,
   guess: json['guess'] as String?,
   finalWagered: json['final_wagered'] as bool? ?? false,
+  reactions: json['reactions'] == null
+      ? const PlayerReactions()
+      : PlayerReactions.fromJson(json['reactions'] as Map<String, dynamic>),
 );
 
 Map<String, dynamic> _$PlayerViewToJson(_PlayerView instance) =>
@@ -151,10 +180,13 @@ Map<String, dynamic> _$PlayerViewToJson(_PlayerView instance) =>
       'host': instance.host,
       'connected': instance.connected,
       'ready': instance.ready,
+      'ready_for_next_game': instance.readyForNextGame,
+      'spectating': instance.spectating,
       'score': instance.score,
       'answered': instance.answered,
       'guess': instance.guess,
       'final_wagered': instance.finalWagered,
+      'reactions': instance.reactions.toJson(),
     };
 
 _You _$YouFromJson(Map<String, dynamic> json) => _You(
@@ -176,6 +208,11 @@ _You _$YouFromJson(Map<String, dynamic> json) => _You(
       const <String, bool>{},
   judged: json['judged'] as bool? ?? false,
   playedAgain: json['played_again'] as bool? ?? false,
+  spectating: json['spectating'] as bool? ?? false,
+  canRate: json['can_rate'] as bool? ?? false,
+  rating: (json['rating'] as num?)?.toInt() ?? 0,
+  reported: json['reported'] as bool? ?? false,
+  poppers: (json['poppers'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$YouToJson(_You instance) => <String, dynamic>{
@@ -187,6 +224,11 @@ Map<String, dynamic> _$YouToJson(_You instance) => <String, dynamic>{
   'judgements': instance.judgements,
   'judged': instance.judged,
   'played_again': instance.playedAgain,
+  'spectating': instance.spectating,
+  'can_rate': instance.canRate,
+  'rating': instance.rating,
+  'reported': instance.reported,
+  'poppers': instance.poppers,
 };
 
 _OwnAnswer _$OwnAnswerFromJson(Map<String, dynamic> json) => _OwnAnswer(
@@ -237,6 +279,7 @@ _FinalRound _$FinalRoundFromJson(Map<String, dynamic> json) => _FinalRound(
       const <String, int>{},
   picked: json['picked'] as String?,
   vote: json['vote'] as String?,
+  nextGameCode: json['next_game_code'] as String?,
   wager: (json['wager'] as num?)?.toInt(),
   wagers:
       (json['wagers'] as List<dynamic>?)
@@ -250,9 +293,53 @@ Map<String, dynamic> _$FinalRoundToJson(_FinalRound instance) =>
       'votes': instance.votes,
       'picked': instance.picked,
       'vote': instance.vote,
+      'next_game_code': instance.nextGameCode,
       'wager': instance.wager,
       'wagers': instance.wagers.map((e) => e.toJson()).toList(),
     };
+
+_Notice _$NoticeFromJson(Map<String, dynamic> json) => _Notice(
+  kind: json['kind'] as String,
+  level: json['level'] as String? ?? 'info',
+  title: json['title'] as String?,
+  message: json['message'] as String?,
+  until: (json['until'] as num).toInt(),
+);
+
+Map<String, dynamic> _$NoticeToJson(_Notice instance) => <String, dynamic>{
+  'kind': instance.kind,
+  'level': instance.level,
+  'title': instance.title,
+  'message': instance.message,
+  'until': instance.until,
+};
+
+_StartCountdown _$StartCountdownFromJson(Map<String, dynamic> json) =>
+    _StartCountdown(
+      kind: json['kind'] as String,
+      until: (json['until'] as num).toInt(),
+    );
+
+Map<String, dynamic> _$StartCountdownToJson(_StartCountdown instance) =>
+    <String, dynamic>{'kind': instance.kind, 'until': instance.until};
+
+_PackVote _$PackVoteFromJson(Map<String, dynamic> json) => _PackVote(
+  pack: Pack.fromJson(json['pack'] as Map<String, dynamic>),
+  votes: (json['votes'] as num?)?.toInt() ?? 0,
+  voters:
+      (json['voters'] as List<dynamic>?)
+          ?.map((e) => (e as num).toInt())
+          .toList() ??
+      const <int>[],
+  you: json['you'] as bool? ?? false,
+);
+
+Map<String, dynamic> _$PackVoteToJson(_PackVote instance) => <String, dynamic>{
+  'pack': instance.pack.toJson(),
+  'votes': instance.votes,
+  'voters': instance.voters,
+  'you': instance.you,
+};
 
 _FinalWager _$FinalWagerFromJson(Map<String, dynamic> json) => _FinalWager(
   peerId: (json['peer_id'] as num).toInt(),
@@ -261,3 +348,78 @@ _FinalWager _$FinalWagerFromJson(Map<String, dynamic> json) => _FinalWager(
 
 Map<String, dynamic> _$FinalWagerToJson(_FinalWager instance) =>
     <String, dynamic>{'peer_id': instance.peerId, 'wager': instance.wager};
+
+_PlayerReactions _$PlayerReactionsFromJson(Map<String, dynamic> json) =>
+    _PlayerReactions(
+      total: (json['total'] as num?)?.toInt() ?? 0,
+      recent:
+          (json['recent'] as List<dynamic>?)
+              ?.map((e) => e as String)
+              .toList() ??
+          const <String>[],
+    );
+
+Map<String, dynamic> _$PlayerReactionsToJson(_PlayerReactions instance) =>
+    <String, dynamic>{'total': instance.total, 'recent': instance.recent};
+
+_Reaction _$ReactionFromJson(Map<String, dynamic> json) => _Reaction(
+  id: (json['id'] as num).toInt(),
+  peerId: (json['peer_id'] as num?)?.toInt(),
+  type: json['type'] as String,
+  until: (json['until'] as num).toInt(),
+);
+
+Map<String, dynamic> _$ReactionToJson(_Reaction instance) => <String, dynamic>{
+  'id': instance.id,
+  'peer_id': instance.peerId,
+  'type': instance.type,
+  'until': instance.until,
+};
+
+_ChatState _$ChatStateFromJson(Map<String, dynamic> json) => _ChatState(
+  messages:
+      (json['messages'] as List<dynamic>?)
+          ?.map((e) => ChatMessage.fromJson(e as Map<String, dynamic>))
+          .toList() ??
+      const <ChatMessage>[],
+  unread: (json['unread'] as num?)?.toInt() ?? 0,
+  typing:
+      (json['typing'] as List<dynamic>?)?.map((e) => e as String).toList() ??
+      const <String>[],
+  open: json['open'] as bool? ?? false,
+  hasMore: json['has_more'] as bool? ?? false,
+  loading: json['loading'] as bool? ?? false,
+);
+
+Map<String, dynamic> _$ChatStateToJson(_ChatState instance) =>
+    <String, dynamic>{
+      'messages': instance.messages.map((e) => e.toJson()).toList(),
+      'unread': instance.unread,
+      'typing': instance.typing,
+      'open': instance.open,
+      'has_more': instance.hasMore,
+      'loading': instance.loading,
+    };
+
+_ChatMessage _$ChatMessageFromJson(Map<String, dynamic> json) => _ChatMessage(
+  id: json['id'] as String,
+  peerId: (json['peer_id'] as num?)?.toInt(),
+  name: json['name'] as String?,
+  text: json['text'] as String? ?? '',
+  imageUrl: json['image_url'] as String?,
+  system: json['system'] as bool? ?? false,
+  at: (json['at'] as num?)?.toInt() ?? 0,
+  own: json['own'] as bool? ?? false,
+);
+
+Map<String, dynamic> _$ChatMessageToJson(_ChatMessage instance) =>
+    <String, dynamic>{
+      'id': instance.id,
+      'peer_id': instance.peerId,
+      'name': instance.name,
+      'text': instance.text,
+      'image_url': instance.imageUrl,
+      'system': instance.system,
+      'at': instance.at,
+      'own': instance.own,
+    };

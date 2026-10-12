@@ -11,8 +11,14 @@ defmodule TriviaRelay.Application do
       TriviaRelayWeb.Telemetry,
       {Phoenix.PubSub, name: TriviaRelay.PubSub},
       TriviaRelay.RateLimit,
+      TriviaRelay.Bypass,
       {Registry, keys: :unique, name: TriviaRelay.Seats.Registry},
-      {DynamicSupervisor, name: TriviaRelay.Seats.Supervisor, strategy: :one_for_one},
+      # One seat per Sporcle player (`TriviaRelay.Seats.Seat`).
+      {Registry, keys: :unique, name: TriviaRelay.Seats.Players},
+      {DynamicSupervisor,
+       name: TriviaRelay.Seats.Supervisor,
+       strategy: :one_for_one,
+       max_children: TriviaRelay.Seats.max_seats()},
       TriviaRelayWeb.Endpoint,
       # Last, so it stops first: seats close out loud while the endpoint is still up.
       TriviaRelay.Seats.Drain

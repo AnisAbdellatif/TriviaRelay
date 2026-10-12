@@ -1,11 +1,16 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
+import '../../core/providers/connection_providers.dart';
+import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/countdown.dart';
 import '../../shared/widgets/fz.dart';
 import 'game_screen.dart';
+import 'player_menu.dart';
 import 'players.dart';
 
 /// The final round's vote: an easy, medium or hard last question. Once everybody has
@@ -18,9 +23,16 @@ class FinalVoteView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final pending = ref.watch(pendingIntentsProvider);
+    final sending = pending['vote'] as String?;
     final vote = state.finalRound?.vote;
     final votes = state.finalRound?.votes ?? const {};
+    // A spectating host doesn't vote, as in the official app.
+    final spectating = state.you.spectating;
 
+    // The vote cast is shown chosen, with a check, not greyed out like the
+    // two left behind.
     Widget choice(String value) => Padding(
       padding: const EdgeInsets.only(bottom: 11),
       child: FzButton(
@@ -29,9 +41,19 @@ class FinalVoteView extends ConsumerWidget {
         trailing: vote == value
             ? 'your vote'
             : '${votes[value] ?? 0} vote${votes[value] == 1 ? '' : 's'}',
-        kind: vote == value ? FzButtonKind.pink : FzButtonKind.outline,
-        onPressed: vote == null
-            ? () => act(context, ref, (c) => c.finalVote(value))
+        kind: vote == value || sending == value
+            ? FzButtonKind.pink
+            : FzButtonKind.outline,
+        selected: vote == value,
+        busy: sending == value,
+        onPressed: vote == null && sending == null && canAct && !spectating
+            ? () => act(
+                context,
+                ref,
+                (c) => c.finalVote(value),
+                pending: 'vote',
+                value: value,
+              )
             : null,
       ),
     );
@@ -42,7 +64,10 @@ class FinalVoteView extends ConsumerWidget {
               key: const Key('nextButton'),
               label: 'Move on without the rest',
               kind: FzButtonKind.outline,
-              onPressed: () => act(context, ref, (c) => c.next()),
+              busy: pending.containsKey('next'),
+              onPressed: canAct
+                  ? () => act(context, ref, (c) => c.next(), pending: 'next')
+                  : null,
             )
           : null,
       child: Column(
@@ -52,8 +77,13 @@ class FinalVoteView extends ConsumerWidget {
           Text('Final round', style: fz.t(40)),
           const SizedBox(height: 10),
           Text(
-            'One last question, and you wager 0, 10 or 20 on it. A wrong '
-            'answer costs what you wagered. First: how hard should it be?',
+            spectating
+                ? 'One last question, and the players wager 0, 10 or 20 on '
+                      'it. They vote for how hard it is; you’re hosting as a '
+                      'spectator.'
+                : 'One last question, and you wager 0, 10 or 20 on it. A '
+                      'wrong answer costs what you wagered. First: how hard '
+                      'should it be?',
             style: fz.m(15, color: FzColors.dim, height: 1.55),
           ),
           const SizedBox(height: 16),
@@ -67,7 +97,10 @@ class FinalVoteView extends ConsumerWidget {
           const SizedBox(height: 14),
           const FzEyebrow('Standings'),
           const SizedBox(height: 6),
-          Standings(state: state),
+          Standings(
+            state: state,
+            onTap: (p) => managePlayer(context, ref, state, p),
+          ),
         ],
       ),
     );
@@ -87,28 +120,41 @@ class FinalWagerView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
+    final canAct = ref.watch(seatInteractiveProvider);
+    final pending = ref.watch(pendingIntentsProvider);
+    final sending = pending['wager'] as int?;
     final mine = state.finalRound?.wager;
     final picked = state.finalRound?.picked;
-    final wagered = state.players.where((p) => p.finalWagered).length;
+    final playing = state.playing;
+    final wagered = playing.where((p) => p.finalWagered).length;
+    // A spectating host doesn't wager, as in the official app.
+    final spectating = state.you.spectating;
 
     return FzBody(
       footer: state.you.host
           ? FzButton(
               key: const Key('nextButton'),
               label: 'Ask the final question',
-              trailing: '$wagered/${state.players.length} wagered',
+              trailing: '$wagered/${playing.length} wagered',
               kind: FzButtonKind.pink,
-              onPressed: () => act(context, ref, (c) => c.next()),
+              busy: pending.containsKey('next'),
+              onPressed: canAct
+                  ? () => act(context, ref, (c) => c.next(), pending: 'next')
+                  : null,
             )
           : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Text('Your wager', style: fz.t(40)),
+          Text(spectating ? 'The wagers' : 'Your wager', style: fz.t(40)),
           const SizedBox(height: 10),
           Text(
-            picked == null
+            spectating
+                ? 'The players wager on the final question'
+                      '${picked == null ? '' : ', which is $picked'}. You’re '
+                      'hosting as a spectator.'
+                : picked == null
                 ? 'Right adds it, wrong takes it away.'
                 : 'The final question is $picked. Right adds your wager, '
                       'wrong takes it away.',
@@ -129,9 +175,16 @@ class FinalWagerView extends ConsumerWidget {
                   child: _WagerTile(
                     key: Key('finalWager-$amount'),
                     amount: amount,
-                    chosen: mine == amount,
-                    onPressed: mine == null
-                        ? () => act(context, ref, (c) => c.finalWager(amount))
+                    chosen: mine == amount || sending == amount,
+                    onPressed:
+                        mine == null && sending == null && canAct && !spectating
+                        ? () => act(
+                            context,
+                            ref,
+                            (c) => c.finalWager(amount),
+                            pending: 'wager',
+                            value: amount,
+                          )
                         : null,
                   ),
                 ),
@@ -146,10 +199,17 @@ class FinalWagerView extends ConsumerWidget {
               player: player,
               you: player.peerId == state.you.peerId,
               note: player.finalWagered ? 'wagered' : null,
-              trailing: Text(
-                '${player.score}',
-                style: fz.m(20, color: rank == 0 ? FzColors.ac : FzColors.ink),
-              ),
+              onTap: managePlayer(context, ref, state, player),
+              tapHint: playerMenuHint,
+              trailing: player.spectating
+                  ? null
+                  : Text(
+                      '${player.score}',
+                      style: fz.m(
+                        20,
+                        color: rank == 0 ? FzColors.ac : FzColors.ink,
+                      ),
+                    ),
             ),
         ],
       ),
@@ -166,23 +226,42 @@ class FinalScoresView extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final fz = FzTheme.of(context);
-    final standings = state.standings;
+    final canAct = ref.watch(seatInteractiveProvider);
+    final asking = ref.watch(pendingIntentsProvider).containsKey('playAgain');
+    // A spectating host didn't play, so can't win.
+    final standings = state.standings.where((p) => !p.spectating).toList();
     final top = standings.isEmpty ? null : standings.first.score;
     final winners = standings.where((p) => p.score == top).toList();
+    final next = state.finalRound?.nextGameCode;
 
     return FzBody(
       // Anybody can ask, as in the official app; the host's asking starts
-      // the next game in the same room.
-      footer: FzButton(
-        key: const Key('playAgainButton'),
-        label: state.you.playedAgain && !state.you.host
-            ? 'Waiting for the host'
-            : 'Play again',
-        trailing: state.you.playedAgain ? null : 'same room',
-        onPressed: state.you.playedAgain
-            ? null
-            : () => act(context, ref, (c) => c.playAgain()),
-      ),
+      // the next game in the same room. When it started without this player,
+      // Play again joins it by its code.
+      footer: next != null
+          ? FzButton(
+              key: const Key('playAgainButton'),
+              label: 'Play again',
+              trailing: 'next game $next',
+              busy: asking,
+              onPressed: () => _joinNext(context, ref, next),
+            )
+          : FzButton(
+              key: const Key('playAgainButton'),
+              label: state.you.playedAgain && !state.you.host
+                  ? 'Waiting for the host'
+                  : 'Play again',
+              trailing: state.you.playedAgain ? null : 'same room',
+              busy: asking,
+              onPressed: state.you.playedAgain || !canAct
+                  ? null
+                  : () => act(
+                      context,
+                      ref,
+                      (c) => c.playAgain(),
+                      pending: 'playAgain',
+                    ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -205,10 +284,29 @@ class FinalScoresView extends ConsumerWidget {
           const SizedBox(height: 14),
           const Center(child: FzAccentBars()),
           const SizedBox(height: 30),
-          Standings(state: state),
+          Standings(
+            state: state,
+            onTap: (p) => managePlayer(context, ref, state, p),
+          ),
         ],
       ),
     );
+  }
+
+  /// The next game started without this player (Sporcle's `leave_behind`):
+  /// a seat in it, by its code, in place of this one.
+  Future<void> _joinNext(
+    BuildContext context,
+    WidgetRef ref,
+    String code,
+  ) async {
+    try {
+      await ref
+          .read(pendingIntentsProvider.notifier)
+          .run('playAgain', () => rejoinSeat(ref, code));
+    } on Object catch (error) {
+      if (context.mounted) showError(context, ref, error);
+    }
   }
 }
 
@@ -229,20 +327,26 @@ class _WagerTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
-    return OutlinedButton(
+    final button = OutlinedButton(
       onPressed: onPressed,
-      style: OutlinedButton.styleFrom(
-        minimumSize: const Size.fromHeight(88),
-        padding: EdgeInsets.zero,
-        backgroundColor: chosen
-            ? FzColors.ac2.withValues(alpha: .14)
-            : Colors.transparent,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        side: BorderSide(
-          color: chosen ? FzColors.ac2 : FzColors.line,
-          width: 1.5,
-        ),
-      ),
+      style:
+          OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(88),
+            padding: EdgeInsets.zero,
+            backgroundColor: chosen
+                ? FzColors.ac2.withValues(alpha: .14)
+                : Colors.transparent,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ).copyWith(
+            side: fzFocusRing(
+              otherwise: BorderSide(
+                color: chosen ? FzColors.ac2 : FzColors.edge,
+                width: 1.5,
+              ),
+            ),
+          ),
       child: Text(
         '$amount',
         style: fz.m(
@@ -253,6 +357,7 @@ class _WagerTile extends StatelessWidget {
         ),
       ),
     );
+    return Semantics(selected: chosen, child: button);
   }
 }
 
@@ -272,7 +377,11 @@ class _Winners extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final size = winners.length == 1 ? 96.0 : 72.0;
+    // Each avatar is ringed (16px) and spaced (18px); a tie of three shrinks
+    // them to fit a narrow phone rather than running off it.
+    final room = math.min(MediaQuery.sizeOf(context).width, 480) - 44;
+    final fit = (room - 18 * (winners.length - 1)) / winners.length - 16;
+    final size = math.min(winners.length == 1 ? 96.0 : 72.0, fit);
     return Stack(
       clipBehavior: Clip.none,
       alignment: Alignment.center,

@@ -50,9 +50,25 @@ if System.get_env("PHX_SERVER") do
   config :trivia_relay, TriviaRelayWeb.Endpoint, server: true
 end
 
+# Every connection the relay holds at once (`MAX_CONNECTIONS`, default 4000): sockets
+# and HTTP requests together. The relay shares its server with FazouraParty, and each
+# socket costs memory while open, so there is a ceiling however many callers there are.
+# Thousand Island counts per acceptor: 50 acceptors, each allowed its share. Past the
+# ceiling a new connection waits a moment for room, then is closed.
+max_connections = String.to_integer(System.get_env("MAX_CONNECTIONS", "4000"))
+acceptors = 50
+
 config :trivia_relay, TriviaRelayWeb.Endpoint,
   # 4100 by default, so the relay and FazouraParty's server (4000) can run side by side.
-  http: [port: String.to_integer(System.get_env("PORT", "4100"))]
+  http: [
+    port: String.to_integer(System.get_env("PORT", "4100")),
+    thousand_island_options: [
+      num_acceptors: acceptors,
+      num_connections: max(div(max_connections, acceptors), 1),
+      max_connections_retry_count: 2,
+      max_connections_retry_wait: 500
+    ]
+  ]
 
 # How long a seat stays in its Sporcle game after its phone went away, in seconds: the
 # player keeps their place, and Sporcle never sees them leave, for this long.
@@ -60,9 +76,40 @@ if hold = System.get_env("SEAT_HOLD_SECONDS") do
   config :trivia_relay, :seat_hold_ms, String.to_integer(hold) * 1000
 end
 
+# How many seats the relay holds at most (TriviaRelay.Seats, default 2000); past that,
+# taking a seat is refused with 503 seats_full before Sporcle is asked.
+if max_seats = System.get_env("MAX_SEATS") do
+  config :trivia_relay, :max_seats, String.to_integer(max_seats)
+end
+
+# Password for the web admin panel at `/admin` (bypass code management).
+# Unset, the bypass feature is disabled: no codes can be created, no bearer tokens issued,
+# and `bypass_token` in a `remove` intent always fails. Keep it out of logs and commits.
+if password = System.get_env("ADMIN_PASSWORD") do
+  config :trivia_relay, :admin_password, password
+
+  # Where the DETS file that stores one-time codes lives. Defaults to the system temp dir.
+  # Point this at a volume mount to survive container replacements.
+  path =
+    System.get_env("BYPASS_DETS_PATH") ||
+      Path.join(System.tmp_dir!(), "trivia_relay_bypass.dets")
+
+  config :trivia_relay, :bypass_dets_path, String.to_charlist(path)
+end
+
 # The built web app (`flutter build web` in app/), served at "/".
 if web_dir = System.get_env("WEB_DIR") do
   config :trivia_relay, :web_dir, web_dir
+end
+
+# The SHA-256 fingerprint(s) of the key the Android release is signed with, comma-separated
+# (`AB:CD:…`): what `/.well-known/assetlinks.json` vouches for, so that the released app
+# opens invite links itself (TriviaRelayWeb.AssetLinksController). Unset, that is a 404
+# and links open the web app.
+if prints = System.get_env("ANDROID_CERT_SHA256") do
+  config :trivia_relay,
+         :android_cert_sha256,
+         prints |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
 end
 
 # How many X-Forwarded-For entries are our own proxies' (TriviaRelayWeb.ClientIp). Only

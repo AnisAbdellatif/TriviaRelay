@@ -13,6 +13,10 @@ String describeError(Object error) {
     'sporcle_unavailable' => "Sporcle didn't answer. Try again in a moment.",
     'game_refused' =>
       error.message ?? "Sporcle wouldn't seat you in that game.",
+    'insufficient_poppers' =>
+      'This game has pictures, and joining it takes a Party Popper. You '
+          'have none left: a free one comes back every 4 hours.',
+    'sporcle_refused' => 'Sporcle turned that down. Try again later.',
     'invalid_code' => 'A game code is 4 to 8 digits.',
     'invalid_player' => 'Sign in to Sporcle first.',
     'pack_not_found' => "That pack doesn't exist any more.",
@@ -27,6 +31,20 @@ String describeError(Object error) {
     'invalid_wager' => "That wager isn't available.",
     'invalid_options' => "Those game options aren't allowed.",
     'rate_limited' => 'Too many tries. Wait a moment and try again.',
+    'seats_full' => 'The relay is full right now. Try again in a few minutes.',
+    'relay_busy' =>
+      'The relay is busy waiting on Sporcle. Try again in a moment.',
+    'forbidden_origin' =>
+      "Signing in works only from Trivia Relay's own web page.",
+    'invalid_request' =>
+      "The relay couldn't read that sign-in. Check the email and password, "
+          'then try again.',
+    'not_everyone_answered' =>
+      'Not everyone has answered yet. Reveal opens 5 seconds after time '
+          'runs out.',
+    'invalid_intent' => "That can't be done right now.",
+    'bypass_revoked' => 'Your bypass access was revoked.',
+    GameError.notJoined => 'Not connected to the game right now.',
     GameError.connectionFailed => 'Could not reach the relay.',
     GameError.timeout => 'The relay did not answer.',
     _ => error.message ?? 'Something went wrong (${error.code}).',

@@ -1,0 +1,137 @@
+{
+  "status": "live",
+  "options": {
+    "questions_per_game": 5,
+    "question_seconds": 15
+  },
+  "notice": null,
+  "deadline": null,
+  "final": null,
+  "phase": "lobby",
+  "protocol_version": 1,
+  "question": null,
+  "rounds": [],
+  "game_code": "624949",
+  "players": [
+    {
+      "connected": true,
+      "name": "Hosta",
+      "host": true,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 1,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    },
+    {
+      "connected": true,
+      "name": "Joiner",
+      "host": false,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
+      "peer_id": 2,
+      "ready": true,
+      "ready_for_next_game": true,
+      "score": 0,
+      "spectating": false,
+      "answered": false,
+      "final_wagered": false,
+      "guess": null
+    }
+  ],
+  "reveal": null,
+  "pack": {
+    "id": 156070,
+    "name": "اعلام البلدان / Flags of countries تعاالوو بسرعة",
+    "description": " ممنوع تكتب اسمين",
+    "image_url": "https://static.sporcle.com/pack_images/156070?v=1736199324226",
+    "has_images": false,
+    "num_questions": 169
+  },
+  "countdown": null,
+  "chat": {
+    "messages": [
+      {
+        "id": "m1",
+        "name": "Host",
+        "system": false,
+        "at": 800,
+        "text": "مرحبا!",
+        "own": false,
+        "peer_id": 1,
+        "image_url": null
+      },
+      {
+        "id": "m2",
+        "name": null,
+        "system": true,
+        "at": 900,
+        "text": "Welcome to the game!",
+        "own": false,
+        "peer_id": null,
+        "image_url": null
+      },
+      {
+        "id": "m3",
+        "name": "Joiner",
+        "system": false,
+        "at": 1100,
+        "text": "Hi all",
+        "own": true,
+        "peer_id": 2,
+        "image_url": null
+      },
+      {
+        "id": "m4",
+        "name": "Host",
+        "system": false,
+        "at": 1200,
+        "text": "Ready when you are",
+        "own": false,
+        "peer_id": 1,
+        "image_url": null
+      }
+    ],
+    "open": false,
+    "loading": false,
+    "unread": 1,
+    "typing": [
+      "Host"
+    ],
+    "has_more": false
+  },
+  "reactions": [],
+  "pack_votes": [],
+  "protocol_minor": 3,
+  "server_time": 1790000000000,
+  "you": {
+    "host": false,
+    "poppers": null,
+    "judged": false,
+    "reported": false,
+    "played_again": false,
+    "peer_id": 2,
+    "judgements": {},
+    "answer": null,
+    "wager_choices": [
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "rating": 0,
+    "can_rate": false,
+    "can_reveal": false,
+    "spectating": false
+  }
+}

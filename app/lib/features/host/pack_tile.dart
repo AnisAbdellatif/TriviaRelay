@@ -61,6 +61,7 @@ class PackTile extends StatelessWidget {
     required this.onTap,
     this.selected = false,
     this.trailing,
+    this.onMore,
   });
 
   final PackSummary pack;
@@ -68,13 +69,15 @@ class PackTile extends StatelessWidget {
   final bool selected;
   final Widget? trailing;
 
+  /// Opens the pack up close (bookmark, report); no button without it.
+  final VoidCallback? onMore;
+
   @override
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final description = pack.description?.trim() ?? '';
-    return InkWell(
+    return FzTile(
       key: Key('pack-${pack.id}'),
-      borderRadius: BorderRadius.circular(16),
       onTap: onTap,
       child: FzPanel(
         borderColor: selected ? FzColors.ac : null,
@@ -117,7 +120,22 @@ class PackTile extends StatelessWidget {
             if (selected && trailing == null)
               const Padding(
                 padding: EdgeInsets.only(left: 10),
-                child: Icon(Icons.check_circle, color: FzColors.ac),
+                child: Icon(
+                  Icons.check_circle,
+                  color: FzColors.ac,
+                  semanticLabel: 'Chosen',
+                ),
+              ),
+            if (onMore != null)
+              IconButton(
+                key: Key('packMore-${pack.id}'),
+                tooltip: 'More about ${pack.name.trim()}',
+                onPressed: onMore,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                icon: Icon(
+                  pack.bookmarked == true ? Icons.bookmark : Icons.more_horiz,
+                  color: pack.bookmarked == true ? FzColors.ac : FzColors.dim,
+                ),
               ),
           ],
         ),

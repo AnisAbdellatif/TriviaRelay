@@ -31,6 +31,13 @@ servers:
       env-file: <%= dir %>/.env
       # The same for every other stop: Docker's own on a restart or a reboot.
       stop-timeout: 30
+      # The server is shared with FazouraParty and the host's Caddy, so the relay has a
+      # ceiling: past it Docker kills the container rather than the host swapping or
+      # killing a neighbour. Its own ceiling on connections (MAX_CONNECTIONS, default
+      # 4000, config/runtime.exs) keeps it well under this in normal use. No swap
+      # beyond it.
+      memory: 768m
+      memory-swap: 768m
     # Seats.Drain tells every phone its seat is closing before the relay stops, and
     # each seat leaves its Sporcle game. This is how long Kamal's stop waits, when a
     # deploy replaces the container.
@@ -43,6 +50,13 @@ env:
     # right (TriviaRelayWeb.ClientIp). Honest only because kamal-proxy listens on
     # loopback and the relay publishes nothing.
     TRUST_PROXY: "2"
+    # Bypass codes (TriviaRelay.Bypass) live on the host, so a deploy keeps them and the
+    # devices they let in.
+    BYPASS_DETS_PATH: /app/data/trivia_relay_bypass.dets
+
+# Created once on the host, owned by the container's user (deploy/README.md).
+volumes:
+  - <%= dir %>/data:/app/data
 
 proxy:
   # kamal-proxy routes on the Host header Caddy passes on.

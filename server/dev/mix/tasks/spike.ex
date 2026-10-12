@@ -9,13 +9,16 @@ defmodule Mix.Tasks.Spike do
       mix spike join ABCD --cred join
 
   `--cred NAME` reads `creds/NAME.json` (README). Type `help` at the prompt for commands.
+
+  Development only: this and the rest of the console live in `dev/`, which only the dev
+  and test builds compile (`mix.exs`), so a release carries none of it.
   """
 
   use Mix.Task
 
   alias TriviaRelay.Seats.Intents
-  alias TriviaRelay.Spike.Session
-  alias TriviaRelay.Sporcle.{Cred, FrameLog}
+  alias TriviaRelay.Spike.{Creds, Session}
+  alias TriviaRelay.Sporcle.FrameLog
 
   @switches [
     cred: :string,
@@ -49,7 +52,7 @@ defmodule Mix.Tasks.Spike do
   end
 
   defp load!(name) do
-    case Cred.load(name) do
+    case Creds.load(name) do
       {:ok, cred} -> cred
       {:error, message} -> Mix.raise(message)
     end

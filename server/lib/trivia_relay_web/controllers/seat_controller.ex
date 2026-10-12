@@ -6,20 +6,24 @@ defmodule TriviaRelayWeb.SeatController do
   `POST /api/seats/pack` is the host changing the pack in the lobby.
 
   The player's credentials (`player`) are used for the one Sporcle call and not kept.
+  Besides the per-address meter in the router, seats are metered per Sporcle account,
+  and refused joins (codes Sporcle has no game for) more tightly (`TriviaRelayWeb.Meters`).
   """
 
   use TriviaRelayWeb, :controller
 
   alias TriviaRelay.Seats
   alias TriviaRelay.Sporcle.Cred
-  alias TriviaRelayWeb.{ApiError, SporcleErrors}
+  alias TriviaRelayWeb.{ApiError, ClientIp, Meters, SporcleErrors}
 
   def join(conn, %{"code" => code} = params) when is_binary(code) do
     code = String.trim(code)
 
     if Regex.match?(~r/^\d{4,8}$/, code) do
       with {:ok, cred} <- Cred.new(params["player"]),
-           {:ok, seat} <- Seats.join(cred, code) do
+           ip = ClientIp.from_conn(conn),
+           :ok <- Meters.seat_allowed(:join, cred, ip),
+           {:ok, seat} <- Meters.seat_result(:join, cred, ip, Seats.join(cred, code)) do
         created(conn, seat)
       else
         error -> SporcleErrors.send(conn, error)
@@ -34,7 +38,10 @@ defmodule TriviaRelayWeb.SeatController do
 
   def host(conn, %{"pack_id" => pack_id} = params) when is_integer(pack_id) do
     with {:ok, cred} <- Cred.new(params["player"]),
-         {:ok, seat} <- Seats.host(cred, pack_id, params["options"]) do
+         ip = ClientIp.from_conn(conn),
+         :ok <- Meters.seat_allowed(:host, cred, ip),
+         {:ok, seat} <-
+           Meters.seat_result(:host, cred, ip, Seats.host(cred, pack_id, params["options"])) do
       created(conn, seat)
     else
       error -> SporcleErrors.send(conn, error)
@@ -60,6 +67,11 @@ defmodule TriviaRelayWeb.SeatController do
   defp created(conn, seat) do
     conn
     |> put_status(:created)
-    |> json(%{seat_id: seat.id, seat_token: seat.token, game_code: seat.game_code})
+    |> json(%{
+      seat_id: seat.id,
+      seat_token: seat.token,
+      game_code: seat.game_code,
+      poppers: Map.get(seat, :poppers)
+    })
   end
 end

@@ -2,17 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/invite/invite_link.dart';
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../core/providers/settings_providers.dart';
 import '../../shared/navigation.dart';
 import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/update_banner.dart';
 import '../host/host_setup_screen.dart';
+import '../join/game_browser_screen.dart';
 import '../settings/settings_screen.dart';
 
-/// Join a game by its code, host one, or go back to the game this phone is in.
+/// Join a game by its code or from the games open to join, host one, or go
+/// back to the game this phone is in.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -23,6 +27,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _code = TextEditingController();
   bool _busy = false;
+  bool _offering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // An invite link may have opened the app before anybody was signed in.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offerInvite());
+  }
 
   @override
   void dispose() {
@@ -30,7 +42,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  static bool validCode(String code) => RegExp(r'^\d{4,8}$').hasMatch(code);
+  static bool validCode(String code) => isGameCode(code);
+
+  /// A game an invite link asked to join (protocol/PROTOCOL.md §3.8): its code
+  /// goes in the field, and the person is asked. Nothing joins without a yes.
+  Future<void> _offerInvite() async {
+    if (_offering || !mounted) return;
+    final code = ref.read(pendingInviteProvider.notifier).take();
+    if (code == null) return;
+    _offering = true;
+    setState(() => _code.text = code);
+    final held = ref.read(currentSeatProvider).value;
+    final already = held?.gameCode == code;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(already ? 'Back to game $code?' : 'Join game $code?'),
+        content: Text(
+          already
+              ? 'An invite link for the game you are in. Your seat is held.'
+              : 'An invite link opened Trivia Relay. Join the game it is '
+                    'for?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            key: const Key('confirmInviteButton'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(already ? 'Go back' : 'Join'),
+          ),
+        ],
+      ),
+    );
+    _offering = false;
+    if (join != true || !mounted) return;
+    // A link can come in over a game already open: this one takes its place.
+    goHome(context);
+    await (already ? _resume() : _joinCode(code));
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -44,10 +96,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
   }
 
-  Future<void> _join() => _run(() async {
+  Future<void> _join() => _joinCode(_code.text.trim());
+
+  Future<void> _browse() async {
+    final game = await GameBrowserScreen.pick(context);
+    if (game != null) await _joinCode(game.code);
+  }
+
+  Future<void> _joinCode(String code) => _run(() async {
     final account = ref.read(accountProvider).value;
     if (account == null) return;
-    final code = _code.text.trim();
     await openSeat(
       context,
       ref,
@@ -66,6 +124,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final account = ref.watch(accountProvider).value;
     final seat = ref.watch(currentSeatProvider).value;
     final code = _code.text.trim();
+    ref.listen(pendingInviteProvider, (_, next) {
+      if (next != null) _offerInvite();
+    });
 
     return Scaffold(
       body: FzPage(
@@ -74,7 +135,10 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
             const FzMark(size: 30),
             const SizedBox(width: 12),
             Expanded(
-              child: FzEyebrow('Signed in as ${account?.handle ?? '…'}'),
+              child: FzEyebrow(
+                'Signed in as ${account?.handle ?? '…'}',
+                maxLines: 2,
+              ),
             ),
             FzCircleButton(
               key: const Key('settingsButton'),
@@ -90,7 +154,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const UpdateBanner(),
             if (seat != null) ...[
               FzButton(
                 key: const Key('resumeButton'),
@@ -121,6 +184,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              // In the page rather than over the buttons, where it pushed the
+              // code field off a small screen.
+              const UpdateBanner(),
               Text('Trivia Relay', style: fz.t(44)),
               const SizedBox(height: 16),
               const Align(
@@ -141,32 +207,48 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               const SizedBox(height: 32),
               const FzEyebrow('Join a game'),
               const SizedBox(height: 10),
-              TextField(
-                key: const Key('codeField'),
-                controller: _code,
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                  LengthLimitingTextInputFormatter(8),
-                ],
-                textAlign: TextAlign.center,
-                style: fz.m(30, tracking: .3),
-                decoration: InputDecoration(
-                  hintText: 'Game code',
-                  enabledBorder: fzFieldBorder(FzColors.ac),
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 16,
+              // Already 30px: at twice that, six digits ran off a small
+              // phone's field. Large text still gets half as big again.
+              MediaQuery.withClampedTextScaling(
+                maxScaleFactor: 1.5,
+                child: TextField(
+                  key: const Key('codeField'),
+                  controller: _code,
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.digitsOnly,
+                    LengthLimitingTextInputFormatter(8),
+                  ],
+                  textAlign: TextAlign.center,
+                  style: fz.m(30, tracking: .3),
+                  // Room below it for the Join button as it scrolls into view
+                  // over the keyboard.
+                  scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+                  decoration: InputDecoration(
+                    hintText: 'Game code',
+                    enabledBorder: fzKeyFieldBorder,
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 18,
+                      vertical: 16,
+                    ),
                   ),
+                  onChanged: (_) => setState(() {}),
+                  onSubmitted: (_) => validCode(code) ? _join() : null,
                 ),
-                onChanged: (_) => setState(() {}),
-                onSubmitted: (_) => validCode(code) ? _join() : null,
               ),
               const SizedBox(height: 10),
               FzButton(
                 key: const Key('joinButton'),
                 label: _busy ? 'Joining…' : 'Join',
                 onPressed: validCode(code) && !_busy ? _join : null,
+              ),
+              const SizedBox(height: 11),
+              FzButton(
+                key: const Key('browseGamesButton'),
+                label: 'Find a game',
+                trailing: 'open to join',
+                kind: FzButtonKind.outline,
+                onPressed: _busy ? null : _browse,
               ),
             ],
           ),

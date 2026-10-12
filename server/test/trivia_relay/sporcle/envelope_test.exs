@@ -42,6 +42,36 @@ defmodule TriviaRelay.Sporcle.EnvelopeTest do
     assert {3, 7} in msg.fields
   end
 
+  test "a message for one player names that peer as the target and this one as the sender" do
+    json = ~s(["honk",{"peerId":2,"honk_type":"goose"}])
+    # f1 200, f3 5 (the target), f5 2 (the sender), f6 1, f7 2, f15 the JSON: the fields of
+    # the official app's `sendTo` (decompiled), in the order of the captured broadcast.
+    body = hex("08c80118052802300138027a") <> <<byte_size(json)>> <> json
+
+    assert Envelope.game_to(5, 2, "honk", %{peerId: 2, honk_type: "goose"}) ==
+             <<byte_size(body)>> <> body
+
+    {[decoded], ""} = Envelope.split(Envelope.game_to(5, 2, "honk", %{}))
+    assert {:ok, %{event: "honk", fields: fields}} = Envelope.decode(decoded)
+    assert {3, 5} in fields
+    assert {5, 2} in fields
+  end
+
+  test "reads field 5 as the signed sender: a peer for a sendTo, -1 for the server, nil when absent" do
+    {[peer], ""} = Envelope.split(Envelope.game_to(5, 2, "honk", %{}))
+    assert {:ok, %{sender: 2}} = Envelope.decode(peer)
+
+    {[server], ""} = Envelope.split(Envelope.game_to(1, -1, "promote_to_host", %{}))
+    assert {:ok, %{sender: -1}} = Envelope.decode(server)
+
+    json = ~s(["x"])
+    assert {:ok, %{sender: nil}} = Envelope.decode(<<0x7A, byte_size(json)>> <> json)
+  end
+
+  test "a message for one player needs a real peer" do
+    assert_raise FunctionClauseError, fn -> Envelope.game_to(-1, 2, "honk", %{}) end
+  end
+
   test "reads -1 back from a ten-byte varint" do
     {[body], ""} = Envelope.split(Envelope.game("x", %{}))
     assert {:ok, %{fields: fields}} = Envelope.decode(body)
@@ -62,6 +92,14 @@ defmodule TriviaRelay.Sporcle.EnvelopeTest do
     assert {[_], rest} = Envelope.split(partial)
     assert {[_, _], ""} = Envelope.split(whole)
     assert byte_size(rest) > 0
+  end
+
+  test "split refuses a message longer than the limit as soon as its length says so" do
+    big = Envelope.game("a", String.duplicate("x", 2_000))
+    assert {[_], ""} = Envelope.split(big, 4_000)
+    assert {:error, :too_large} = Envelope.split(big, 1_000)
+    # Only the length has arrived: nothing to wait for.
+    assert {:error, :too_large} = Envelope.split(binary_part(big, 0, 3), 1_000)
   end
 
   test "undecodable bytes are an error, not a crash" do

@@ -7,9 +7,13 @@ import '../theme/fz_theme.dart';
 import 'fz.dart';
 
 /// A rounded Flare strip under the top bar while the socket is reconnecting
-/// or lost.
+/// or lost. Lost for good ([ConnectionStatus.disconnected]: the relay turned
+/// a rejoin down), it offers [onReconnect] rather than leaving the last
+/// snapshot on screen as if it were live.
 class ConnectionBanner extends ConsumerWidget {
-  const ConnectionBanner({super.key});
+  const ConnectionBanner({super.key, this.onReconnect});
+
+  final VoidCallback? onReconnect;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -25,7 +29,7 @@ class ConnectionBanner extends ConsumerWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Container(
-          height: 36,
+          constraints: const BoxConstraints(minHeight: 36),
           margin: const EdgeInsets.fromLTRB(22, 8, 22, 4),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
@@ -46,7 +50,17 @@ class ConnectionBanner extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              FzEyebrow(text, color: FzColors.ac2),
+              Expanded(
+                child: FzEyebrow(text, color: FzColors.ac2, maxLines: 1),
+              ),
+              if (status == ConnectionStatus.disconnected &&
+                  onReconnect != null)
+                TextButton(
+                  key: const Key('reconnectButton'),
+                  onPressed: onReconnect,
+                  style: TextButton.styleFrom(foregroundColor: FzColors.ac2),
+                  child: const Text('Reconnect'),
+                ),
             ],
           ),
         ),

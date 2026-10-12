@@ -143,7 +143,7 @@ defmodule TriviaRelay.Seats.IntentsTest do
   end
 
   describe "changing the pack" do
-    test "is the host's, in the lobby, and shows at once" do
+    test "is the host's, in the lobby, and shows at once; anybody else's is a vote" do
       pack = %{"id" => 268_682, "name" => "Capitals"}
 
       assert {:ok, [{"change_pack", %{gamePack: ^pack}}], s} =
@@ -151,7 +151,9 @@ defmodule TriviaRelay.Seats.IntentsTest do
 
       assert s.pack.id == 268_682
 
-      assert {:error, "not_host"} = Intents.change_pack(Replay.fresh(:lobby, :join), pack)
+      assert {:ok, [{"vote_on_pack", %{gamePack: ^pack}}], _} =
+               Intents.change_pack(Replay.fresh(:lobby, :join), pack)
+
       assert {:error, "wrong_phase"} = Intents.change_pack(Replay.fresh(:question), pack)
     end
   end
@@ -213,6 +215,28 @@ defmodule TriviaRelay.Seats.IntentsTest do
              Intents.handle(s, "ready", %{"ready" => true})
 
     assert s.players[s.peer_id].ready
+  end
+
+  test "a ready that changes nothing isn't sent on" do
+    s = Replay.fresh(:lobby)
+    assert s.players[s.peer_id].ready
+    assert {:ok, [], ^s} = Intents.handle(s, "ready", %{"ready" => true})
+  end
+
+  test "only players in the game can be judged" do
+    s = Replay.fresh(:reveal)
+
+    assert {:error, "invalid_intent"} =
+             Intents.handle(s, "judge", %{"peer_id" => 99, "correct" => true})
+
+    assert s.judgements == %{}
+  end
+
+  test "a final wager Sporcle already has counts as placed" do
+    # The seat didn't place it itself (a new seat, say), but Sporcle lists it.
+    s = Replay.first(&(&1.phase == :final_wager and Map.has_key?(&1.final.wagers, 1)))
+    assert s.final.wager == nil
+    assert {:error, "already_wagered"} = Intents.handle(s, "final_wager", %{"amount" => 10})
   end
 
   test "nothing goes to Sporcle before the seat is connected" do

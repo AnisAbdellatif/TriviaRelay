@@ -6,7 +6,8 @@
 #   scripts/ci.sh server       # Elixir: compile, format, credo, test
 #   scripts/ci.sh app          # Flutter: format, analyze, test, web build
 #   scripts/ci.sh image        # build the production Docker image
-#   scripts/ci.sh apk          # signed Android APK + the release manifest
+#   scripts/ci.sh apk          # unsigned release APK (Gradle; never sees the key)
+#   scripts/ci.sh sign         # sign that APK + the release manifest (no Gradle, no pub)
 #   scripts/ci.sh versions     # just the toolchain check (or: versions server|app)
 #
 # This file is the definition of those checks: .github/workflows/ci.yml calls it
@@ -38,7 +39,7 @@ warned=0
 
 step()  { printf '\n%s==> %s%s\n' "$BOLD" "$1" "$OFF"; }
 warn()  { printf '%sWARNING%s %s\n' "$YELLOW" "$OFF" "$1"; warned=1; }
-fail()  { printf '%sFAILED%s %s\n' "$RED" "$OFF" "$1"; exit 1; }
+fail()  { printf '%sFAILED%s %s\n' "$RED" "$OFF" "$1" >&2; exit 1; }
 ok()    { printf '%s%s%s\n' "$GREEN" "$1" "$OFF"; }
 
 have() { command -v "$1" >/dev/null 2>&1; }
@@ -108,9 +109,16 @@ app() {
   dart format --set-exit-if-changed lib test
   flutter analyze
   flutter test
-  flutter build web --release
+  web_build
 
   cd "$ROOT"
+}
+
+# The web app, as the image ships it. CanvasKit comes out of the build, not from
+# gstatic.com: the relay's Content-Security-Policy allows scripts from itself only,
+# and a copy on a CDN is code the page runs that nobody here can pin.
+web_build() {
+  flutter build web --release --no-web-resources-cdn
 }
 
 # The version pubspec.yaml declares, as the two halves Android wants: the name people
@@ -180,18 +188,26 @@ sha256_of() {
 }
 
 # The release APK people install by hand, and the manifest the installed app reads to
-# find out it is out of date (app/lib/core/update/).
+# find out it is out of date (app/lib/core/update/). Two steps, so the signing key is
+# never in the same place as the code a build downloads and runs:
 #
-# Not part of `all`: it needs an Android SDK and the signing key, neither of which a
-# check should demand. It is the one supported way to build an APK for somebody else,
-# and unlike Gradle, which falls back to the debug key, it refuses to produce an APK
-# nobody can update from.
-apk() {
-  step "Android APK"
+#   apk   builds the APK unsigned. Gradle and pub run plugins nobody here wrote, so
+#         Gradle is given nothing of the key: no signing config, no password in the
+#         environment (the variables are cleared for the build even if set). In CI
+#         there is no keystore on the machine at all; locally, keep yours outside
+#         app/ if that matters to you (ANDROID_KEYSTORE_PATH).
+#   sign  signs that APK with the Android build-tools' zipalign and apksigner, checks
+#         the signature, and writes the manifest from the signed file. No Gradle, no
+#         pub. In CI it is a separate job on a fresh machine, the only one that is given
+#         the key (.github/workflows/ci.yml).
+#
+# Not part of `all`: they need an Android SDK and the signing key, neither of which a
+# check should demand. They are the one supported way to build an APK for somebody
+# else, and `sign` refuses to produce an APK nobody can update from.
 
-  have python3 || fail "python3 not found (it writes the release manifest)"
-
-  local version code tag server repo out apk_path file notes size digest
+# Reads the release's version and tag and checks them, for both steps.
+release_version() {
+  local version code
   version="$(pubspec_version)"
   code="$(pubspec_version_code)"
   [ -n "$version" ] && [ -n "$code" ] || fail "could not read 'version:' from app/pubspec.yaml"
@@ -201,8 +217,7 @@ apk() {
   # A release built against the wrong tag would publish a build whose own idea of its
   # version disagrees with where it is published. Checked only when a tag is named, so
   # a local build to try the thing out still works.
-  tag="${RELEASE_TAG:-v$version}"
-  REL_TAG="$tag"
+  REL_TAG="${RELEASE_TAG:-v$version}"
   if [ -n "${RELEASE_TAG:-}" ] && [ "$RELEASE_TAG" != "v$version" ]; then
     fail "tag $RELEASE_TAG does not match app/pubspec.yaml ($version) — bump the pubspec, or tag v$version"
   fi
@@ -218,51 +233,164 @@ apk() {
     git -C "$ROOT" merge-base --is-ancestor HEAD origin/main ||
       fail "$RELEASE_TAG is on a commit that is not on main — tag what was merged, not a branch"
   fi
+}
+
+RELEASE_DIR="$ROOT/app/build/release"
+unsigned_apk() { printf '%s/trivia-relay-%s-unsigned.apk' "$RELEASE_DIR" "$REL_VERSION"; }
+
+apk() {
+  step "Android APK (unsigned)"
+
+  local server repo apk_path
+  release_version
 
   # Android has no origin to be served from, so the relay it talks to is baked in
   # (app/lib/core/providers/config_providers.dart). Without this the build would
-  # quietly point at localhost and never reach a game.
+  # have no relay at all. It carries the player's Sporcle token and the seat's, so
+  # it is https: a release is never built to talk to a relay in the clear.
   server="${SERVER_URL:-}"
   if [ -z "$server" ] && [ -n "${PUBLIC_HOST:-}" ]; then
     server="https://$PUBLIC_HOST"
   fi
   [ -n "$server" ] || fail "set SERVER_URL (or PUBLIC_HOST) — a build with no relay in it is useless"
-
-  if [ -z "${ANDROID_KEYSTORE_PATH:-}" ] && [ ! -f "$ROOT/app/android/key.properties" ]; then
-    fail "no signing key: set ANDROID_KEYSTORE_PATH (and the passwords) or write app/android/key.properties. See README.md."
-  fi
+  printf '%s' "$server" | grep -qE '^https://[A-Za-z0-9.-]+(:[0-9]+)?/?$' ||
+    fail "SERVER_URL '$server' is not https://<host>[:port] — a release only talks to its relay over TLS"
 
   repo="$(release_repo)" ||
     fail "could not work out the GitHub repository from 'origin' — set GITHUB_REPOSITORY"
 
   cd "$ROOT/app"
-  flutter pub get
+  # `env -u`: whatever signing variables this shell has, the build does not get them.
+  local -a no_key=(env -u ANDROID_KEYSTORE_BASE64 -u ANDROID_KEYSTORE_PATH
+    -u ANDROID_KEYSTORE_PASSWORD -u ANDROID_KEY_ALIAS -u ANDROID_KEY_PASSWORD)
+  "${no_key[@]}" flutter pub get
   # One universal APK rather than one per ABI: it is downloaded by hand from a link.
   # x86_64 is left out: only emulators run it, and they get theirs from `flutter run`.
-  TRIVIA_RELAY_RELEASE_BUILD=1 flutter build apk --release \
+  "${no_key[@]}" TRIVIA_RELAY_RELEASE_BUILD=1 flutter build apk --release \
     --target-platform android-arm,android-arm64 \
     --dart-define="SERVER_URL=$server" \
-    --dart-define="APP_VERSION=$version" \
-    --dart-define="APP_VERSION_CODE=$code" \
+    --dart-define="APP_VERSION=$REL_VERSION" \
+    --dart-define="APP_VERSION_CODE=$REL_CODE" \
     --dart-define="UPDATE_MANIFEST_URL=https://github.com/$repo/releases/latest/download/android.json"
 
-  apk_path="build/app/outputs/flutter-apk/app-release.apk"
-  [ -f "$apk_path" ] || fail "$apk_path was not produced"
+  # Gradle's own output: the Flutter tool copies it to flutter-apk/ under the name of a
+  # signed one, which it is not.
+  apk_path="build/app/outputs/apk/release/app-release-unsigned.apk"
+  [ -f "$apk_path" ] || fail "$apk_path was not produced (is the release build still unsigned? app/android/app/build.gradle.kts)"
 
-  out="$ROOT/app/build/release"
-  file="trivia-relay-$version.apk"
-  rm -rf "$out"
-  mkdir -p "$out"
-  cp "$apk_path" "$out/$file"
+  rm -rf "$RELEASE_DIR"
+  mkdir -p "$RELEASE_DIR"
+  cp "$apk_path" "$(unsigned_apk)"
 
-  size="$(wc -c < "$out/$file" | tr -d " ")"
-  digest="$(sha256_of "$out/$file")"
-  notes="${RELEASE_NOTES:-$(git -C "$ROOT" tag -l --format="%(contents:subject)" "$tag" 2>/dev/null || true)}"
+  cd "$ROOT"
+  ok "$(unsigned_apk)  (unsigned; next: scripts/ci.sh sign)"
+}
+
+# The newest Android build-tools with apksigner in them.
+build_tools() {
+  local sdk="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}"
+  if [ -z "$sdk" ] && [ -f "$ROOT/app/android/local.properties" ]; then
+    sdk="$(sed -n 's/^sdk\.dir=//p' "$ROOT/app/android/local.properties" | head -1)"
+  fi
+  [ -n "$sdk" ] && [ -d "$sdk/build-tools" ] ||
+    fail "no Android SDK: set ANDROID_HOME (it needs build-tools, for zipalign and apksigner)"
+  local dir
+  dir="$(find "$sdk/build-tools" -mindepth 2 -maxdepth 2 -name apksigner -printf '%h\n' 2>/dev/null |
+    sort -V | tail -1)"
+  [ -n "$dir" ] && [ -x "$dir/zipalign" ] ||
+    fail "no build-tools with zipalign and apksigner under $sdk/build-tools"
+  printf '%s' "$dir"
+}
+
+# One value from app/android/key.properties, or nothing.
+key_property() {
+  [ -f "$ROOT/app/android/key.properties" ] || return 0
+  sed -n "s/^[[:space:]]*$1[[:space:]]*=[[:space:]]*//p" "$ROOT/app/android/key.properties" |
+    head -1 | tr -d '\r'
+}
+
+sign() {
+  step "Android APK (sign)"
+
+  have python3 || fail "python3 not found (it writes the release manifest)"
+
+  local tools repo unsigned aligned file signed keystore alias size digest notes
+  release_version
+  tools="$(build_tools)"
+  repo="$(release_repo)" ||
+    fail "could not work out the GitHub repository from 'origin' — set GITHUB_REPOSITORY"
+
+  unsigned="$(unsigned_apk)"
+  [ -f "$unsigned" ] || fail "$unsigned is missing — run 'scripts/ci.sh apk' first"
+
+  # The key: in CI the keystore arrives base64-encoded in the environment and is
+  # written out only for as long as this function runs; locally it is a file named by
+  # ANDROID_KEYSTORE_PATH or app/android/key.properties (storeFile, relative to
+  # app/android/app as Gradle had it).
+  #
+  # Every release has to be signed with the same key or Android refuses to install one
+  # over another, and every existing user is stuck.
+  local keydir
+  keydir="$(mktemp -d)"
+  # shellcheck disable=SC2064 # the path is fixed now, on purpose
+  trap "rm -rf '$keydir'" EXIT
+  if [ -n "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+    keystore="$keydir/release.jks"
+    (umask 077 && printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore") ||
+      fail "ANDROID_KEYSTORE_BASE64 is not valid base64"
+  else
+    keystore="${ANDROID_KEYSTORE_PATH:-$(key_property storeFile)}"
+    case "$keystore" in
+      "" ) ;;
+      /*) ;;
+      *) [ -n "${ANDROID_KEYSTORE_PATH:-}" ] || keystore="$ROOT/app/android/app/$keystore" ;;
+    esac
+  fi
+  [ -n "$keystore" ] && [ -f "$keystore" ] ||
+    fail "no signing key: set ANDROID_KEYSTORE_PATH (and the passwords) or write app/android/key.properties. See README.md."
+
+  # Passwords reach apksigner through its environment (`env:`), never its command
+  # line, which any process on the machine can read.
+  TR_KS_PASS="${ANDROID_KEYSTORE_PASSWORD:-$(key_property storePassword)}"
+  TR_KEY_PASS="${ANDROID_KEY_PASSWORD:-$(key_property keyPassword)}"
+  alias="${ANDROID_KEY_ALIAS:-$(key_property keyAlias)}"
+  [ -n "$TR_KS_PASS" ] || fail "no keystore password: set ANDROID_KEYSTORE_PASSWORD or storePassword in key.properties"
+  [ -n "$alias" ] || fail "no key alias: set ANDROID_KEY_ALIAS or keyAlias in key.properties"
+  # keytool has written PKCS12 since Java 9, which has one password for the store and
+  # the key, so the key's falls back to the store's rather than being required.
+  [ -n "$TR_KEY_PASS" ] || TR_KEY_PASS="$TR_KS_PASS"
+  export TR_KS_PASS TR_KEY_PASS
+
+  file="trivia-relay-$REL_VERSION.apk"
+  signed="$RELEASE_DIR/$file"
+  aligned="$keydir/aligned.apk"
+  # A failed run must not leave an earlier run's APK and manifest looking current.
+  rm -f "$signed" "$signed.idsig" "$RELEASE_DIR/android.json"
+
+  # Aligned before signing (signing after is what keeps the alignment valid), with
+  # native libraries on 16 KB pages, which Android 15+ devices with 16 KB pages need.
+  "$tools/zipalign" -f -P 16 4 "$unsigned" "$aligned"
+  "$tools/apksigner" sign \
+    --ks "$keystore" --ks-pass env:TR_KS_PASS \
+    --ks-key-alias "$alias" --key-pass env:TR_KEY_PASS \
+    --out "$signed" "$aligned"
+  unset TR_KS_PASS TR_KEY_PASS
+  rm -rf "$keydir"
+  trap - EXIT
+
+  "$tools/zipalign" -c -P 16 4 "$signed" || fail "$signed is not aligned"
+  "$tools/apksigner" verify --verbose --print-certs "$signed" ||
+    fail "$signed does not verify"
+  rm -f "$unsigned" "$signed.idsig"
+
+  size="$(wc -c < "$signed" | tr -d " ")"
+  digest="$(sha256_of "$signed")"
+  notes="${RELEASE_NOTES:-$(git -C "$ROOT" tag -l --format="%(contents:subject)" "$REL_TAG" 2>/dev/null || true)}"
 
   # python3 rather than a heredoc, so a tag message with a quote in it cannot produce
   # a manifest the app refuses to parse.
-  VERSION="$version" CODE="$code" URL="https://github.com/$repo/releases/download/$tag/$file" \
-  SIZE="$size" DIGEST="$digest" NOTES="$notes" python3 - "$out/android.json" <<'PYTHON'
+  VERSION="$REL_VERSION" CODE="$REL_CODE" URL="https://github.com/$repo/releases/download/$REL_TAG/$file" \
+  SIZE="$size" DIGEST="$digest" NOTES="$notes" python3 - "$RELEASE_DIR/android.json" <<'PYTHON'
 import json, os, sys
 
 manifest = {
@@ -281,9 +409,8 @@ with open(sys.argv[1], "w", encoding="utf-8") as out:
     out.write("\n")
 PYTHON
 
-  cd "$ROOT"
-  ok "app/build/release/$file  ($((size / 1048576)) MB, $tag)"
-  cat "$out/android.json"
+  ok "app/build/release/$file  ($((size / 1048576)) MB, $REL_TAG)"
+  cat "$RELEASE_DIR/android.json"
 }
 
 image() {
@@ -309,10 +436,12 @@ main() {
     server)   versions server; server ;;
     app)      versions app; app ;;
     image)    image ;;
-    # Not part of `all`: a release needs an Android SDK and the signing key.
+    # Not part of `all`: a release needs an Android SDK and the signing key. `sign`
+    # needs no Flutter: it is the build-tools and the key, and nothing else.
     apk)      versions app; apk ;;
+    sign)     sign ;;
     all)      versions; server; app; image ;;
-    *)        fail "unknown target '$target' (use: all, server, app, image, apk, versions)" ;;
+    *)        fail "unknown target '$target' (use: all, server, app, image, apk, sign, versions)" ;;
   esac
 
   if [ "$warned" = 1 ]; then

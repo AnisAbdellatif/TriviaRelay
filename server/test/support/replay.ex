@@ -9,10 +9,19 @@ defmodule TriviaRelay.Replay do
     %{"me" => me, "events" => events} = Fixtures.read!("sporcle/hosted_game.json")
     me = if as == :host, do: me, else: "sporcle_id//joinPlayer"
 
+    events = if as == :host, do: events, else: Enum.map(events, &as_joiner/1)
+
     Enum.scan(events, {State.new(me), nil}, fn e, {s, _} ->
       {State.apply_event(s, e["event"], e["payload"], e["t_ms"]), e}
     end)
   end
+
+  # The recording is the host's: each `list_answers` carries the host's own used wagers
+  # (`playerWagers`), which the joiner's own would never list.
+  defp as_joiner(%{"event" => "list_answers", "payload" => %{} = p} = e),
+    do: %{e | "payload" => Map.delete(p, "playerWagers")}
+
+  defp as_joiner(e), do: e
 
   @doc "The first state matching `fun`."
   def first(fun, as \\ :host) do

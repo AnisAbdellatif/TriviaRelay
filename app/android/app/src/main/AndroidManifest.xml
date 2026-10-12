@@ -1,9 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Nothing leaves the device in a backup or a device-to-device transfer: the app
+         keeps the player's Sporcle Party token, its device id and the held seat's token
+         (lib/core/storage/app_store.dart), and a restored copy of those on another
+         phone is somebody else holding the account. `allowBackup` covers Android 11
+         and below, `dataExtractionRules` 12 and above (where `allowBackup="false"` no
+         longer stops a device-to-device transfer), and `fullBackupContent` excludes
+         everything again in case a manufacturer backs up regardless. Signing in again
+         on a new phone is the cost. -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="${appLabel}"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="@xml/backup_rules"
+        android:dataExtractionRules="@xml/data_extraction_rules">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -24,6 +35,21 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+            <!-- Invite links, https://<relay>/join/<code> (protocol/PROTOCOL.md §3.8):
+                 the relay the build was made for (build.gradle.kts, from SERVER_URL).
+                 Android opens them here once the relay's /.well-known/assetlinks.json
+                 vouches for this app's signing key; until then, in the browser, where
+                 the relay serves the web app. Flutter hands the path over as a route
+                 (lib/main.dart), and nothing joins until the person says so. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="${inviteLinkHost}"
+                    android:pathPrefix="/join/"/>
             </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.

@@ -30,8 +30,11 @@ defmodule TriviaRelay.MixProject do
     ]
   end
 
-  # Specifies which paths to compile per environment.
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # Specifies which paths to compile per environment. `dev/` is the spike console
+  # (`mix spike`): compiled for development, and for tests so CI checks it, never into a
+  # release.
+  defp elixirc_paths(:test), do: ["lib", "dev", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "dev"]
   defp elixirc_paths(_), do: ["lib"]
 
   # Specifies your project dependencies.

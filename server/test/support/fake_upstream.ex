@@ -5,9 +5,11 @@ defmodule TriviaRelay.FakeUpstream do
   The test that owns it is named in the player session, as `"test_pid"` (a pid, or the
   string `:erlang.pid_to_list/1` makes of one, for sessions that come through a stubbed
   REST response). It hears `{:fake_upstream, pid, owner}` when a seat starts one,
-  `{:sent, event, payload}` for every message the seat sends Sporcle, and
+  `{:sent, event, payload}` for every message the seat sends Sporcle (`{:sent_to, target,
+  sender, event, payload}` for one sent to a single player), and
   `:upstream_closed`. To play Sporcle's side, the test sends the seat
-  `{:upstream, label, {:event, name, payload}}` itself.
+  `{:upstream, label, {:event, name, payload, sender}}` itself (`sender` `-1` for a server
+  message, a peer id for a forged `sendTo`; the `sporcle/3,4` helpers do this).
   """
 
   def start_link(opts) do
@@ -23,12 +25,23 @@ defmodule TriviaRelay.FakeUpstream do
     :ok
   end
 
+  def cast_event(pid, event, payload \\ :none), do: send_event(pid, event, payload)
+
+  def cast_event_to(pid, target, sender, event, payload) do
+    send(pid, {:send_to, target, sender, event, payload})
+    :ok
+  end
+
   def close(pid), do: send(pid, :close)
 
   defp loop(test) do
     receive do
       {:send, event, payload} ->
         send(test, {:sent, event, payload})
+        loop(test)
+
+      {:send_to, target, sender, event, payload} ->
+        send(test, {:sent_to, target, sender, event, payload})
         loop(test)
 
       :close ->

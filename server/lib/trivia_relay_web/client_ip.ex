@@ -16,8 +16,13 @@ defmodule TriviaRelayWeb.ClientIp do
   An IPv6 address answers as its /64 network (`2001:db8:1:2::/64`). One subscriber is
   normally handed a whole /64 and can use any address in it, so counting single
   addresses would give anybody with IPv6 a fresh identity per request — past every rate
-  limit and every ban.
+  limit and every ban. A /48 is cheap too (free tunnel brokers hand them out, 65,536
+  /64s each), so meters also count the /48 it sits in (`limits/2`), with more room,
+  since one /48 can be many unrelated subscribers.
   """
+
+  # How much more a /48 may do than one /64 in it.
+  @wide_factor 4
 
   @spec from_conn(Plug.Conn.t()) :: String.t()
   def from_conn(conn) do
@@ -39,6 +44,31 @@ defmodule TriviaRelayWeb.ClientIp do
       end
 
     normalize(forwarded || peer)
+  end
+
+  @doc """
+  Every key a caller is metered under, each with its limit when one address may make
+  `limit` requests: the address itself, and for IPv6 also its /48, allowed
+  `#{@wide_factor}` times as many. Nil (no address known) is metered as `"unknown"`.
+  """
+  @spec limits(String.t() | nil, pos_integer()) :: [{String.t(), pos_integer()}]
+  def limits(nil, limit), do: [{"unknown", limit}]
+
+  def limits(address, limit) do
+    case wide(address) do
+      nil -> [{address, limit}]
+      wide -> [{address, limit}, {wide, limit * @wide_factor}]
+    end
+  end
+
+  # The /48 an IPv6 /64 (as `normalize/1` writes it) belongs to.
+  defp wide(address) do
+    with [network, "64"] <- String.split(address, "/"),
+         {:ok, {a, b, c, _, _, _, _, _}} <- :inet.parse_address(String.to_charlist(network)) do
+      ntoa({a, b, c, 0, 0, 0, 0, 0}) <> "/48"
+    else
+      _ -> nil
+    end
   end
 
   # The entry the outermost of our proxies appended: `hops` from the right. Fewer
