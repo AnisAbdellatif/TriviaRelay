@@ -47,6 +47,13 @@ defmodule TriviaRelayWeb.Plugs.WebApp do
 
   defp serve(%{path_info: []} = conn, dir), do: conn |> protect() |> send_index(dir)
 
+  # An invite link (`/join/<code>`, protocol/PROTOCOL.md §3.8) is the app itself, which
+  # reads the code from its address and offers to join. Only a code as games have them:
+  # anything else under /join is nothing here.
+  defp serve(%{path_info: ["join", code]} = conn, dir) do
+    if invite_code?(code), do: conn |> protect() |> send_index(dir), else: conn
+  end
+
   defp serve(conn, dir) do
     Plug.Static.call(
       protect(conn),
@@ -108,6 +115,9 @@ defmodule TriviaRelayWeb.Plugs.WebApp do
       "; "
     )
   end
+
+  @doc "Whether `code` is a game code: 4 to 8 digits."
+  def invite_code?(code), do: is_binary(code) and String.match?(code, ~r/\A\d{4,8}\z/)
 
   # The app is a single page: "/" is the shell.
   defp send_index(conn, dir) do

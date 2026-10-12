@@ -20,8 +20,18 @@ defmodule TriviaRelayWeb.WebAppTest do
     end
   end
 
+  test "an invite link is the app, for a game code only", %{conn: conn} do
+    conn = get(conn, "/join/624949")
+    assert response(conn, 200) == "<html></html>"
+    assert policy(conn)["frame-ancestors"] == ["'none'"]
+
+    for path <- ["/join/12", "/join/12345678901", "/join/abcd", "/join/1234/x"] do
+      assert build_conn() |> get(path) |> response(404)
+    end
+  end
+
   test "the shell and its files carry a full policy", %{conn: conn} do
-    for path <- ["/", "/flutter_bootstrap.js"] do
+    for path <- ["/", "/join/1234", "/flutter_bootstrap.js"] do
       conn = get(conn, path)
       assert conn.status == 200
       policy = policy(conn)

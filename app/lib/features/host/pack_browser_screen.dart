@@ -9,6 +9,8 @@ import '../../core/providers/connection_providers.dart';
 import '../../shared/navigation.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
+import '../../shared/seat_flow.dart';
+import 'pack_sheet.dart';
 import 'pack_tile.dart';
 
 /// Browsing Sporcle's pack catalog, as the official app's pack screen does:
@@ -141,6 +143,31 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
     unawaited(_load());
   }
 
+  /// The pack up close; choosing it there picks it.
+  Future<void> _open(PackSummary pack) async {
+    if (await PackSheet.show(context, pack) && mounted) {
+      Navigator.of(context).pop(pack);
+    }
+  }
+
+  bool _randomBusy = false;
+
+  /// A pack the catalog picks (protocol/PROTOCOL.md §3.2), shown up close to
+  /// be chosen or not.
+  Future<void> _random() async {
+    setState(() => _randomBusy = true);
+    try {
+      final account = await ref.read(accountProvider.future);
+      if (account == null) throw const GameError(code: 'invalid_player');
+      final pack = await ref.read(relayApiProvider).randomPack(account);
+      if (mounted) await _open(pack);
+    } on Object catch (error) {
+      if (mounted) showError(context, ref, error);
+    } finally {
+      if (mounted) setState(() => _randomBusy = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
@@ -165,6 +192,12 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                         ),
                         const SizedBox(width: 12),
                         Expanded(child: Text('Pick a pack', style: fz.t(28))),
+                        FzCircleButton(
+                          key: const Key('randomPackButton'),
+                          icon: Icons.casino_outlined,
+                          tooltip: 'A random pack',
+                          onPressed: _randomBusy ? null : _random,
+                        ),
                       ],
                     ),
                   ),
@@ -244,6 +277,7 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                             pack: pack,
                             selected: pack.id == widget.selectedId,
                             onTap: () => Navigator.of(context).pop(pack),
+                            onMore: () => _open(pack),
                           ),
                         );
                       },

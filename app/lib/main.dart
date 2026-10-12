@@ -5,8 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'features/account/sign_in_screen.dart';
 import 'features/home/home_screen.dart';
+import 'core/invite/invite_link.dart';
 import 'core/providers/account_providers.dart';
 import 'core/providers/config_providers.dart';
+import 'core/providers/settings_providers.dart';
+import 'shared/platform/platform.dart';
 import 'shared/theme/fz_theme.dart';
 import 'shared/widgets/fz.dart';
 
@@ -17,7 +20,38 @@ void main() {
   // Built from the start, the web app is readable, and its buttons are real
   // buttons to the browser. The handle is never disposed: on for good.
   if (kIsWeb) SemanticsBinding.instance.ensureSemantics();
-  runApp(const ProviderScope(child: TriviaRelayApp()));
+
+  final container = ProviderContainer();
+  // An invite link (`/join/<code>`) the app was opened at, and any that come
+  // in while it runs (Android hands those over as routes): each is offered on
+  // the home screen, never joined by itself. Registered before the app, so
+  // this is the first to see a link and the Navigator never tries it as a
+  // route.
+  final invites = container.read(pendingInviteProvider.notifier);
+  invites.offer(inviteCodeFromRoute(launchRoute()));
+  WidgetsBinding.instance.addObserver(_InviteLinks(invites.offer));
+
+  runApp(
+    UncontrolledProviderScope(
+      container: container,
+      child: const TriviaRelayApp(),
+    ),
+  );
+}
+
+/// Takes an invite link pushed to the running app, and nothing else.
+class _InviteLinks with WidgetsBindingObserver {
+  _InviteLinks(this.offer);
+
+  final void Function(String? code) offer;
+
+  @override
+  Future<bool> didPushRouteInformation(RouteInformation info) async {
+    final code = inviteCode(info.uri);
+    if (code == null) return false;
+    offer(code);
+    return true;
+  }
 }
 
 class TriviaRelayApp extends StatelessWidget {
@@ -33,7 +67,14 @@ class TriviaRelayApp extends StatelessWidget {
         fz: FzTheme.fallback,
         applyTextFont: (base) => base.apply(fontFamily: 'Figtree'),
       ),
-      home: const RootScreen(),
+      // One screen to start on, whatever route the app was opened at: an
+      // invite link's path is read above, not pushed as pages.
+      onGenerateInitialRoutes: (_) => [
+        MaterialPageRoute<void>(builder: (_) => const RootScreen()),
+      ],
+      onGenerateRoute: (settings) => settings.name == Navigator.defaultRouteName
+          ? MaterialPageRoute<void>(builder: (_) => const RootScreen())
+          : null,
     );
   }
 }

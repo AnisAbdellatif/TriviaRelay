@@ -1,19 +1,21 @@
 {
   "status": "live",
   "options": {
-    "question_seconds": 15,
-    "questions_per_game": 5
+    "questions_per_game": 5,
+    "question_seconds": 15
   },
+  "notice": null,
   "deadline": 1790000015000,
   "final": {
-    "picked": "easy",
+    "wagers": [],
+    "next_game_code": null,
     "vote": null,
+    "wager": null,
+    "picked": "easy",
     "votes": {
       "easy": 1,
       "hard": 1
-    },
-    "wager": null,
-    "wagers": []
+    }
   },
   "phase": "final_wager",
   "protocol_version": 1,
@@ -52,14 +54,21 @@
       "percent": 8
     }
   ],
+  "game_code": "624949",
   "players": [
     {
       "connected": true,
       "name": "Hosta",
       "host": true,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
       "peer_id": 1,
       "ready": true,
+      "ready_for_next_game": true,
       "score": 0,
+      "spectating": false,
       "answered": false,
       "final_wagered": false,
       "guess": null
@@ -68,9 +77,15 @@
       "connected": true,
       "name": "Joiner",
       "host": false,
+      "reactions": {
+        "total": 0,
+        "recent": []
+      },
       "peer_id": 2,
       "ready": true,
+      "ready_for_next_game": true,
       "score": 1,
+      "spectating": false,
       "answered": false,
       "final_wagered": false,
       "guess": null
@@ -85,21 +100,36 @@
     "has_images": false,
     "num_questions": 169
   },
-  "game_code": "624949",
+  "countdown": null,
+  "chat": {
+    "messages": [],
+    "open": false,
+    "loading": false,
+    "unread": 0,
+    "typing": [],
+    "has_more": false
+  },
+  "reactions": [],
+  "pack_votes": [],
   "protocol_minor": 2,
   "server_time": 1790000000000,
   "you": {
     "host": true,
+    "poppers": null,
     "judged": true,
-    "judgements": {},
-    "peer_id": 1,
+    "reported": false,
     "played_again": false,
+    "peer_id": 1,
+    "judgements": {},
     "answer": null,
-    "can_reveal": false,
     "wager_choices": [
       0,
       10,
       20
-    ]
+    ],
+    "rating": 0,
+    "can_rate": false,
+    "can_reveal": false,
+    "spectating": false
   }
 }

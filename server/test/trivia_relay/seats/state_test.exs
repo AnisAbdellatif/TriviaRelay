@@ -73,10 +73,25 @@ defmodule TriviaRelay.Seats.StateTest do
     assert s.final.wagers == %{1 => 20, 2 => 10}
   end
 
-  test "times a question from its arrival", %{me: me, events: events} do
+  test "times a question from its arrival, the first after the start's countdown", %{
+    me: me,
+    events: events
+  } do
     {s, e} = replay(me, events) |> Enum.find(fn {s, _} -> s.phase == :question end)
-    assert s.deadline == e["t_ms"] + 15_000
+    assert s.countdown == %{kind: "start", until: e["t_ms"] + 5_000}
+    assert s.deadline == e["t_ms"] + 5_000 + 15_000
     assert s.question.index == 0 and s.question.final == false
+
+    {s, e} =
+      replay(me, events)
+      |> Enum.find(fn {s, _} -> s.phase == :question and s.question.index == 1 end)
+
+    assert s.countdown == nil
+    assert s.deadline == e["t_ms"] + 15_000
+
+    {s, e} = replay(me, events) |> Enum.find(fn {s, _} -> s.phase == :final_question end)
+    assert s.countdown == %{kind: "final", until: e["t_ms"] + 3_000}
+    assert s.deadline == e["t_ms"] + 3_000 + 15_000
   end
 
   test "shows others' guesses once you've answered, and the answer only at the reveal",
@@ -124,7 +139,7 @@ defmodule TriviaRelay.Seats.StateTest do
   describe "due/2" do
     setup %{me: me, events: events} do
       {s, e} = replay(me, events) |> Enum.find(fn {s, _} -> s.phase == :question end)
-      %{s: %{s | answers: %{}}, deadline: e["t_ms"] + 15_000}
+      %{s: %{s | answers: %{}}, deadline: e["t_ms"] + 5_000 + 15_000}
     end
 
     test "answers for an absent player when time runs out", %{s: s, deadline: deadline} do

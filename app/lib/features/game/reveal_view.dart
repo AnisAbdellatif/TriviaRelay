@@ -7,7 +7,9 @@ import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
 import 'game_screen.dart';
+import 'player_menu.dart';
 import 'players.dart';
+import 'question_feedback.dart';
 
 /// A revealed question: the answer and everybody's guess. The host marks each
 /// guess right or wrong (Sporcle's own check is exact-match, so a spelling or
@@ -164,7 +166,9 @@ class RevealView extends ConsumerWidget {
               ),
             ),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 8),
+          QuestionFeedback(state: state),
+          const SizedBox(height: 12),
           FzEyebrow(
             host && !judged
                 ? 'Switch on the right guesses'
@@ -224,7 +228,11 @@ class RevealView extends ConsumerWidget {
           const SizedBox(height: 22),
           const FzEyebrow('Standings'),
           const SizedBox(height: 6),
-          Standings(state: state, gains: gains),
+          Standings(
+            state: state,
+            gains: gains,
+            onTap: (p) => managePlayer(context, ref, state, p),
+          ),
         ],
       ),
     );

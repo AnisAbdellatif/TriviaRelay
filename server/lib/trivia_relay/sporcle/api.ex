@@ -33,8 +33,15 @@ defmodule TriviaRelay.Sporcle.Api do
     {"public", "publicGames"}
   ]
 
+  # What the official app's "Report Pack" offers, by value (decompiled only).
+  @report_reasons ~w(harassment offensive spam inaccurate other)
+
   def constants,
-    do: %{"pack_lists" => @pack_list_order, "game_lists" => Enum.map(@game_lists, &elem(&1, 0))}
+    do: %{
+      "pack_lists" => @pack_list_order,
+      "game_lists" => Enum.map(@game_lists, &elem(&1, 0)),
+      "pack_report_reasons" => @report_reasons
+    }
 
   @doc "Pack metadata (name, question count, image); never the questions."
   def get_pack(%Cred{} = cred, pack_id) do
@@ -83,10 +90,89 @@ defmodule TriviaRelay.Sporcle.Api do
     end
   end
 
-  @doc "Joins a game by code; the response carries this player's `playerSession`."
+  @doc """
+  Joins a game by code. The response carries this player's `playerSession` and their
+  `popper_count`, or, when Sporcle won't seat them, `denied: {code, message}` and no
+  session (`BuyPopper` for a game with images and no Party Popper left).
+  """
   def join_game(%Cred{} = cred, code) do
     request(cred, :post, "/joinGame", json: %{gameCode: code})
   end
+
+  @doc "What a pack may be reported for, as the official app offers it."
+  def report_reasons, do: @report_reasons
+
+  @doc "A pack the catalog picks at random, the catalog's own map as `get_pack/2` gives it."
+  def random_pack(%Cred{} = cred) do
+    with {:ok, body} <- request(cred, :get, "/getRandomPack", params: []) do
+      {:ok, data(body)["pack"]}
+    end
+  end
+
+  @doc """
+  Bookmarks pack `pack_id` (`bookmarked` true) or stops bookmarking it. The official app
+  sends the pack's state *before* the tap and Sporcle turns it over (decompiled only),
+  so what is sent is the opposite of what is asked for.
+  """
+  def bookmark_pack(%Cred{} = cred, pack_id, bookmarked) when is_boolean(bookmarked) do
+    request(cred, :post, "/bookmarkPack", json: %{pack_id: pack_id, bookmarked: !bookmarked})
+  end
+
+  @doc """
+  Subscribes to pack `pack_id` (Sporcle then tells the player, in its own app, when
+  somebody hosts it) or stops. The flag is sent as `bookmark_pack/3` sends its own.
+  """
+  def subscribe_pack(%Cred{} = cred, pack_id, subscribed) when is_boolean(subscribed) do
+    request(cred, :post, "/subscribePack", json: %{pack_id: pack_id, subscribed: !subscribed})
+  end
+
+  @doc "Reports pack `pack_id` to Sporcle for one of `report_reasons/0`, in the player's words."
+  def report_pack(%Cred{} = cred, pack_id, reason, details) when reason in @report_reasons do
+    request(cred, :post, "/reportPack",
+      json: %{pack_id: pack_id, reason: reason, extraInfoText: details}
+    )
+  end
+
+  @doc """
+  Claims the Party Poppers the player has earned back (one every 4 hours, up to 5).
+  Answers `{popper_count, popper_last_claim}` whether or not there were any to claim.
+  """
+  def claim_poppers(%Cred{} = cred) do
+    with {:ok, body} <- request(cred, :post, "/claimPoppers", json: %{}), do: {:ok, data(body)}
+  end
+
+  @doc """
+  A page of the player's friends: `{:ok, friends}`, Sporcle's map of them by the id an
+  invitation takes, each a player map (`playerId`, `sporcleHandle`, `teamName`,
+  `friendStatus`, …).
+  """
+  def friends(%Cred{} = cred, page \\ 0) do
+    with {:ok, body} <- request(cred, :get, "/getFriends", params: [page: page]) do
+      {:ok, data(body)["friends"] || %{}}
+    end
+  end
+
+  @doc """
+  Invites one friend (`friend_id`, as `friends/2` keys them) to `game`, or every friend
+  with `:all`. `game` is `%{gameCode, gamePack: %{id, name, img_src}}`, as the official
+  app sends it.
+  """
+  def invite(%Cred{} = cred, :all, game),
+    do: request(cred, :post, "/inviteAllFriendsToGame", json: %{game: game})
+
+  def invite(%Cred{} = cred, friend_id, game) when is_binary(friend_id),
+    do: request(cred, :post, "/inviteToGame", json: %{friend_uid: friend_id, game: game})
+
+  @doc "Whether Sporcle finds words it won't show in `name`: `{:ok, boolean}`."
+  def name_has_bad_words(%Cred{} = cred, name) do
+    with {:ok, body} <- request(cred, :get, "/getHandleHasBadWords", params: [handle: name]) do
+      {:ok, data(body)["handle_has_bad_words"] == true}
+    end
+  end
+
+  # Most answers are the payload itself; some have come wrapped in `data`.
+  defp data(%{"data" => %{} = data}), do: data
+  defp data(body), do: body
 
   defp request(cred, method, path, opts) do
     [method: method, url: @base <> path, headers: headers(cred)]

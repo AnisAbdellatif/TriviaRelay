@@ -148,6 +148,48 @@ void main() {
     },
   );
 
+  test('the chat and reactions go as the relay\'s intents', () async {
+    final (connection, relay, _) = await attached();
+    for (final intent in <Future<void> Function()>[
+      connection.chatOpen,
+      () => connection.chatSend('hi'),
+      () => connection.chatTyping(true),
+      connection.chatMore,
+      () => connection.react(1),
+      () => connection.react(3, type: 'clap'),
+      connection.chatClose,
+    ]) {
+      unawaited(intent().catchError((Object _) {}));
+    }
+    await pumpEventQueue();
+    final sent = [
+      for (final f in relay.frames)
+        if (f[3] != 'phx_join' && f[3] != 'heartbeat') [f[3], f[4]],
+    ];
+    expect(sent, [
+      ['chat_open', <String, dynamic>{}],
+      [
+        'chat_send',
+        {'text': 'hi'},
+      ],
+      [
+        'chat_typing',
+        {'typing': true},
+      ],
+      ['chat_more', <String, dynamic>{}],
+      [
+        'honk',
+        {'peer_id': 1},
+      ],
+      [
+        'react',
+        {'peer_id': 3, 'type': 'clap'},
+      ],
+      ['chat_close', <String, dynamic>{}],
+    ]);
+    await connection.dispose();
+  });
+
   test('seat_closed then the channel closing is the seat ending', () async {
     final (connection, relay, statuses) = await attached();
     relay

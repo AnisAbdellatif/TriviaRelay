@@ -10,9 +10,14 @@ import '../../shared/widgets/fz_toast.dart';
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/connection_providers.dart';
 import '../../shared/seat_flow.dart';
+import '../../shared/share_invite.dart';
 import '../host/pack_browser_screen.dart';
 import '../host/pack_tile.dart';
+import '../host/spectate_switch.dart';
+import '../invite/invite_friends_sheet.dart';
 import 'game_screen.dart';
+import 'pack_votes.dart';
+import 'player_menu.dart';
 import 'players.dart';
 
 /// Before the game: the code to share, the pack, who's here and who's ready.
@@ -61,9 +66,7 @@ class LobbyView extends ConsumerWidget {
                   '/${state.players.length} ready',
               kind: FzButtonKind.pink,
               busy: pending.containsKey('start'),
-              onPressed: canAct
-                  ? () => act(context, ref, (c) => c.start(), pending: 'start')
-                  : null,
+              onPressed: canAct ? () => _start(context, ref) : null,
             ),
           ],
         ],
@@ -95,20 +98,28 @@ class LobbyView extends ConsumerWidget {
                 onPressed: () => _copy(context, state.gameCode, 'Code copied.'),
               ),
               const SizedBox(width: 4),
-              // No share plugin is bundled: the invite goes on the clipboard,
-              // ready to paste into any chat.
+              // A link to the game on the relay (/join/<code>), through the
+              // share sheet, or the clipboard where there is none.
               FzCircleButton(
                 key: const Key('shareInviteButton'),
                 icon: Icons.ios_share,
-                tooltip: 'Copy an invite',
-                onPressed: () => _copy(
-                  context,
-                  inviteText(state.gameCode),
-                  'Invite copied. Paste it to your friends.',
-                ),
+                tooltip: 'Share an invite link',
+                onPressed: () => shareInvite(context, ref, state.gameCode),
               ),
             ],
           ),
+          if (pack != null) ...[
+            const SizedBox(height: 8),
+            FzButton(
+              key: const Key('inviteFriendsButton'),
+              label: 'Invite friends',
+              kind: FzButtonKind.outline,
+              height: 48,
+              fontSize: 15,
+              onPressed: () =>
+                  InviteFriendsSheet.show(context, packId: pack.id),
+            ),
+          ],
           const SizedBox(height: 14),
           if (pack != null)
             FzPanel(
@@ -160,6 +171,7 @@ class LobbyView extends ConsumerWidget {
             const SizedBox(height: 16),
             _HostOptions(state: state),
           ],
+          PackVotesPanel(state: state),
           const SizedBox(height: 22),
           FzEyebrow('Players · ${state.players.length}'),
           const SizedBox(height: 6),
@@ -168,6 +180,8 @@ class LobbyView extends ConsumerWidget {
               key: ValueKey('player-${player.peerId}'),
               player: player,
               you: player.peerId == state.you.peerId,
+              onTap: managePlayer(context, ref, state, player),
+              tapHint: playerMenuHint,
               trailing: player.ready
                   ? const Icon(
                       Icons.check_circle,
@@ -194,6 +208,34 @@ class LobbyView extends ConsumerWidget {
   ) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (context.mounted) showFzToast(context, done);
+  }
+
+  /// Starts the game; with somebody not ready, asks first, as the official
+  /// app does.
+  Future<void> _start(BuildContext context, WidgetRef ref) async {
+    if (state.players.any((p) => !p.ready)) {
+      final start = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Not everyone is ready'),
+          content: const Text('Start the game anyway?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              key: const Key('confirmStartButton'),
+              style: TextButton.styleFrom(foregroundColor: FzColors.ac2),
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Start the game'),
+            ),
+          ],
+        ),
+      );
+      if (start != true || !context.mounted) return;
+    }
+    await act(context, ref, (c) => c.start(), pending: 'start');
   }
 
   /// The host picks another pack; everybody stays. The lobby shows it once
@@ -233,14 +275,23 @@ class _HostOptions extends ConsumerWidget {
         HostOptions(
           questionsPerGame: state.options.questionsPerGame,
           questionSeconds: state.options.questionSeconds,
+          spectate: state.you.spectating,
         );
+
+    void change(HostOptions options) => act(
+      context,
+      ref,
+      (c) => c.options(options),
+      pending: 'options',
+      value: options,
+    );
 
     Widget chips(
       String prefix,
       List<int> values,
       int selected,
       String Function(int) label,
-      HostOptions Function(int) change,
+      HostOptions Function(int) changed,
     ) => Wrap(
       spacing: 6,
       runSpacing: 6,
@@ -250,18 +301,7 @@ class _HostOptions extends ConsumerWidget {
             key: Key('$prefix-$value'),
             label: Text(label(value), style: fz.m(12)),
             selected: value == selected,
-            onSelected: canAct
-                ? (_) {
-                    final options = change(value);
-                    act(
-                      context,
-                      ref,
-                      (c) => c.options(options),
-                      pending: 'options',
-                      value: options,
-                    );
-                  }
-                : null,
+            onSelected: canAct ? (_) => change(changed(value)) : null,
           ),
       ],
     );
@@ -284,10 +324,15 @@ class _HostOptions extends ConsumerWidget {
           (n) => '${n}s',
           (n) => current.copyWith(questionSeconds: n),
         ),
+        const SizedBox(height: 4),
+        SpectateSwitch(
+          key: const Key('lobbySpectate'),
+          value: current.spectate,
+          onChanged: canAct
+              ? (spectate) => change(current.copyWith(spectate: spectate))
+              : null,
+        ),
       ],
     );
   }
 }
-
-/// What "Copy an invite" puts on the clipboard.
-String inviteText(String code) => 'Join my Trivia Relay game: code $code';

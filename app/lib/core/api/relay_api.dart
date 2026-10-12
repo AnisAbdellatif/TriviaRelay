@@ -105,6 +105,7 @@ class RelayApi {
             'questions_per_game': options.questionsPerGame,
             'question_seconds': options.questionSeconds,
             'audience': options.audience.name,
+            'spectate': options.spectate,
           },
           'player': account.player,
         }),
@@ -113,7 +114,8 @@ class RelayApi {
     return SeatTicket.fromJson(body);
   }
 
-  /// The host changes the lobby's pack to [packId] (§3.3).
+  /// Chooses [packId] in the lobby (§3.3): the host changes the game's pack
+  /// to it, anybody else votes for it.
   Future<void> changePack(
     SporcleAccount account,
     SeatTicket seat,
@@ -132,9 +134,127 @@ class RelayApi {
     );
   }
 
+  /// One pack, with what the player did to it (§3.2).
+  Future<PackSummary> pack(SporcleAccount account, int packId) async {
+    final body = await _send(
+      _client.get(_uri('/api/packs/$packId'), headers: account.headers),
+    );
+    return PackSummary.fromJson(body['pack'] as Map<String, dynamic>);
+  }
+
+  /// Whatever pack the catalog picks this time (§3.2).
+  Future<PackSummary> randomPack(SporcleAccount account) async {
+    final body = await _send(
+      _client.get(_uri('/api/packs/random'), headers: account.headers),
+    );
+    return PackSummary.fromJson(body['pack'] as Map<String, dynamic>);
+  }
+
+  /// Bookmarks the pack, or stops (§3.2). What it is now.
+  Future<bool> setBookmarked(
+    SporcleAccount account,
+    int packId,
+    bool bookmarked,
+  ) async {
+    final body = await _post(account, '/api/packs/$packId/bookmark', {
+      'bookmarked': bookmarked,
+    });
+    return body['bookmarked'] as bool? ?? bookmarked;
+  }
+
+  /// Asks to be told when somebody hosts the pack, or stops (§3.2).
+  Future<bool> setSubscribed(
+    SporcleAccount account,
+    int packId,
+    bool subscribed,
+  ) async {
+    final body = await _post(account, '/api/packs/$packId/subscribe', {
+      'subscribed': subscribed,
+    });
+    return body['subscribed'] as bool? ?? subscribed;
+  }
+
+  /// Reports the pack to Sporcle (§3.2).
+  Future<void> reportPack(
+    SporcleAccount account,
+    int packId,
+    ReportReason reason,
+    String details,
+  ) => _post(account, '/api/packs/$packId/report', {
+    'reason': reason.name,
+    'details': details,
+  });
+
+  /// Claims the Party Poppers Sporcle has given back, and says how many the
+  /// player has (§3.5).
+  Future<PopperBalance> claimPoppers(SporcleAccount account) async =>
+      PopperBalance.fromJson(
+        await _post(account, '/api/poppers/claim', const {}),
+      );
+
+  /// A page of the player's friends (§3.6). `nextPage` is null at the end.
+  Future<({List<Friend> friends, int? nextPage})> friends(
+    SporcleAccount account, {
+    int page = 0,
+  }) async {
+    final body = await _send(
+      _client.get(
+        _uri('/api/friends', {'page': '$page'}),
+        headers: account.headers,
+      ),
+    );
+    return (
+      friends: [
+        for (final friend in body['friends'] as List<dynamic>)
+          Friend.fromJson(friend as Map<String, dynamic>),
+      ],
+      nextPage: (body['next_page'] as num?)?.toInt(),
+    );
+  }
+
+  /// Invites [friendId], or every friend when it is null, to the game [seat]
+  /// is in (§3.6).
+  Future<void> invite(
+    SporcleAccount account,
+    SeatTicket seat, {
+    required int packId,
+    String? friendId,
+  }) => _post(account, '/api/invites', {
+    'seat_token': seat.seatToken,
+    'code': seat.gameCode,
+    'pack_id': packId,
+    'friend_id': friendId,
+  });
+
+  /// Whether Sporcle accepts [name] as the one others see, and the name as
+  /// the relay will pass it on (§3.7).
+  Future<({String name, bool allowed})> checkName(
+    SporcleAccount account,
+    String name,
+  ) async {
+    final body = await _post(account, '/api/names/check', {'name': name});
+    return (
+      name: body['name'] as String? ?? name,
+      allowed: body['allowed'] as bool? ?? false,
+    );
+  }
+
   void close() => _client.close();
 
   static const _json = {'content-type': 'application/json'};
+
+  /// A POST that asks Sporcle something for the player: they go in headers.
+  Future<Map<String, dynamic>> _post(
+    SporcleAccount account,
+    String path,
+    Map<String, dynamic> body,
+  ) => _send(
+    _client.post(
+      _uri(path),
+      headers: {...account.headers, ..._json},
+      body: jsonEncode(body),
+    ),
+  );
 
   Uri _uri(String path, [Map<String, String>? query]) {
     final base = Uri.parse(baseUrl);

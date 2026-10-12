@@ -15,6 +15,10 @@ defmodule TriviaRelayWeb.Meters do
     * **Refused joins** — codes Sporcle has no place in, the way somebody guessing codes
       spends their tries — per account and per address (an IPv6 caller's /64 and /48),
       more tightly than joins that work.
+    * **What reaches other people**, per Sporcle account: packs reported (10 an hour),
+      friends invited one by one (30 per 15 minutes) and all at once (3 per 15
+      minutes). Each lands in somebody's notifications or Sporcle's report queue, from
+      the relay's one address, so a script mustn't be able to repeat it.
 
   Each refusal is `{:error, :rate_limited}`, told as `429 rate_limited`. Off when
   `:rate_limit_enabled` is (tests turn it on where they test it).
@@ -25,8 +29,13 @@ defmodule TriviaRelayWeb.Meters do
   alias TriviaRelayWeb.ClientIp
   alias TriviaRelayWeb.Plugs.RateLimit, as: Plug
 
+  @hour 60 * 60_000
   @quarter_hour 15 * 60_000
   @minute 60_000
+
+  @reports_per_account 10
+  @invites_per_account 30
+  @invite_alls_per_account 3
 
   @login_failures_per_email 5
   @login_failures_per_minute 30
@@ -88,6 +97,33 @@ defmodule TriviaRelayWeb.Meters do
     result
   end
 
+  @doc """
+  Whether `cred` may ask Sporcle to do `kind` now, for the things a player asks Sporcle
+  to do that reach other people or Sporcle's staff: `:report` (a pack reported),
+  `:invite` (one friend invited) and `:invite_all` (every friend at once). Counted, as
+  seats are, only once Sporcle has answered for the account (`account_result/3`).
+  """
+  @spec account_allowed(:report | :invite | :invite_all, Cred.t()) ::
+          :ok | {:error, :rate_limited}
+  def account_allowed(kind, %Cred{} = cred) do
+    {limit, window} = allowance(kind)
+
+    if Plug.enabled?() and RateLimit.exceeded?(kind, cred.player_id, limit, window),
+      do: {:error, :rate_limited},
+      else: :ok
+  end
+
+  @doc "Counts what `kind` came to for `cred`. Returns `result`."
+  def account_result(kind, %Cred{} = cred, result) do
+    {limit, window} = allowance(kind)
+    if answered?(result), do: RateLimit.check(kind, cred.player_id, limit, window)
+    result
+  end
+
+  defp allowance(:report), do: {@reports_per_account, @hour}
+  defp allowance(:invite), do: {@invites_per_account, @quarter_hour}
+  defp allowance(:invite_all), do: {@invite_alls_per_account, @quarter_hour}
+
   defp bucket(:host), do: :account_hosts
   defp bucket(:join), do: :account_joins
 
@@ -102,7 +138,12 @@ defmodule TriviaRelayWeb.Meters do
   defp answered?(result), do: refused?(result)
 
   # A code Sporcle has no place in: it answers 200 with no session, or an error that
-  # isn't about the sign-in.
+  # isn't about the sign-in. A game that exists but won't take this player (no Party
+  # Popper for its pictures, full, blocked) is no sign of guessing.
+  defp refused?({:error, {:refused, %{"denied" => %{"code" => code}}}})
+       when code in ["BuyPopper", "GameFull", "Blocked"],
+       do: false
+
   defp refused?({:error, {:refused, _}}), do: true
 
   defp refused?({:error, {:http, status, _}})

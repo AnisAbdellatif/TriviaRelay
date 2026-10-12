@@ -67,6 +67,11 @@ defmodule TriviaRelayWeb.SeatController do
   defp created(conn, seat) do
     conn
     |> put_status(:created)
-    |> json(%{seat_id: seat.id, seat_token: seat.token, game_code: seat.game_code})
+    |> json(%{
+      seat_id: seat.id,
+      seat_token: seat.token,
+      game_code: seat.game_code,
+      poppers: Map.get(seat, :poppers)
+    })
   end
 end

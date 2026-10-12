@@ -9,6 +9,8 @@ defmodule TriviaRelay.Sporcle.Identity do
   from `SPORCLE_API_KEY` (`server/.env.example` says what it is and where to find it).
   """
 
+  alias TriviaRelay.Sporcle.Cred
+
   @version "1.5.15.297"
 
   def api_key, do: Application.fetch_env!(:trivia_relay, :sporcle_api_key)
@@ -26,6 +28,10 @@ defmodule TriviaRelay.Sporcle.Identity do
 
   A host's login carries the game options again: the server takes them from
   here, not from `createGame` (the official app sends both).
+
+  `teamName` is the name the others see; the official app shows `sporcleHandle` under it
+  as "@handle" (decompiled only), so that one is always the account's own handle, and a
+  name the player chose goes in `teamName` alone.
   """
   def player(cred, host?, options \\ nil)
 
@@ -38,7 +44,7 @@ defmodule TriviaRelay.Sporcle.Identity do
   def player(cred, host?, _options) do
     %{
       "isHost" => host?,
-      "teamName" => cred.handle,
+      "teamName" => Cred.display_name(cred),
       "mascotType" => "none",
       "mascotCustomImageUrl" => "",
       "hatType" => "None",

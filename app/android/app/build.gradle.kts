@@ -1,3 +1,6 @@
+import java.net.URI
+import java.util.Base64
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
@@ -17,6 +20,21 @@ plugins {
 // colliding with it. A collision is not an upgrade either way: the signatures differ,
 // so Android would refuse it, or make you uninstall the real app first.
 val releaseBuild = System.getenv("TRIVIA_RELAY_RELEASE_BUILD") == "1"
+
+// The relay's host, for the invite links the app opens (AndroidManifest.xml): read from
+// the SERVER_URL the build is given (`--dart-define`, which Flutter hands Gradle as
+// base64 in `dart-defines`), so the links and the relay the app talks to are one. A
+// build without one (`flutter run`) claims an address that can't exist.
+val inviteLinkHost: String = run {
+    val defines = (project.findProperty("dart-defines") as String?).orEmpty()
+    defines.split(",").filter { it.isNotBlank() }
+        .map { String(Base64.getDecoder().decode(it), Charsets.UTF_8) }
+        .firstOrNull { it.startsWith("SERVER_URL=") }
+        ?.removePrefix("SERVER_URL=")
+        ?.let { runCatching { URI(it).host }.getOrNull() }
+        ?.takeIf { it.isNotBlank() }
+        ?: "relay.invalid"
+}
 
 android {
     namespace = "com.triviarelay.trivia_relay"
@@ -40,6 +58,7 @@ android {
 
         if (!releaseBuild) applicationIdSuffix = ".dev"
         manifestPlaceholders["appLabel"] = if (releaseBuild) "Trivia Relay" else "Trivia Relay Dev"
+        manifestPlaceholders["inviteLinkHost"] = inviteLinkHost
 
         // `--target-platform` in `scripts/ci.sh apk` picks which ABIs Flutter's own
         // engine and snapshot are built for. This says the same thing to everything

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/invite/invite_link.dart';
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../core/providers/settings_providers.dart';
 import '../../shared/navigation.dart';
 import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
@@ -25,6 +27,14 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   final _code = TextEditingController();
   bool _busy = false;
+  bool _offering = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // An invite link may have opened the app before anybody was signed in.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _offerInvite());
+  }
 
   @override
   void dispose() {
@@ -32,7 +42,47 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  static bool validCode(String code) => RegExp(r'^\d{4,8}$').hasMatch(code);
+  static bool validCode(String code) => isGameCode(code);
+
+  /// A game an invite link asked to join (protocol/PROTOCOL.md §3.8): its code
+  /// goes in the field, and the person is asked. Nothing joins without a yes.
+  Future<void> _offerInvite() async {
+    if (_offering || !mounted) return;
+    final code = ref.read(pendingInviteProvider.notifier).take();
+    if (code == null) return;
+    _offering = true;
+    setState(() => _code.text = code);
+    final held = ref.read(currentSeatProvider).value;
+    final already = held?.gameCode == code;
+    final join = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(already ? 'Back to game $code?' : 'Join game $code?'),
+        content: Text(
+          already
+              ? 'An invite link for the game you are in. Your seat is held.'
+              : 'An invite link opened Trivia Relay. Join the game it is '
+                    'for?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Not now'),
+          ),
+          TextButton(
+            key: const Key('confirmInviteButton'),
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text(already ? 'Go back' : 'Join'),
+          ),
+        ],
+      ),
+    );
+    _offering = false;
+    if (join != true || !mounted) return;
+    // A link can come in over a game already open: this one takes its place.
+    goHome(context);
+    await (already ? _resume() : _joinCode(code));
+  }
 
   Future<void> _run(Future<void> Function() action) async {
     if (_busy) return;
@@ -74,6 +124,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final account = ref.watch(accountProvider).value;
     final seat = ref.watch(currentSeatProvider).value;
     final code = _code.text.trim();
+    ref.listen(pendingInviteProvider, (_, next) {
+      if (next != null) _offerInvite();
+    });
 
     return Scaffold(
       body: FzPage(

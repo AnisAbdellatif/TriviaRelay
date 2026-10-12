@@ -61,12 +61,16 @@ class PackTile extends StatelessWidget {
     required this.onTap,
     this.selected = false,
     this.trailing,
+    this.onMore,
   });
 
   final PackSummary pack;
   final VoidCallback onTap;
   final bool selected;
   final Widget? trailing;
+
+  /// Opens the pack up close (bookmark, report); no button without it.
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
@@ -120,6 +124,17 @@ class PackTile extends StatelessWidget {
                   Icons.check_circle,
                   color: FzColors.ac,
                   semanticLabel: 'Chosen',
+                ),
+              ),
+            if (onMore != null)
+              IconButton(
+                key: Key('packMore-${pack.id}'),
+                tooltip: 'More about ${pack.name.trim()}',
+                onPressed: onMore,
+                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+                icon: Icon(
+                  pack.bookmarked == true ? Icons.bookmark : Icons.more_horiz,
+                  color: pack.bookmarked == true ? FzColors.ac : FzColors.dim,
                 ),
               ),
           ],

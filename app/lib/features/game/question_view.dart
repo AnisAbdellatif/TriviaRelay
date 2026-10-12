@@ -13,7 +13,9 @@ import '../../shared/widgets/countdown.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
 import 'game_screen.dart';
+import 'player_menu.dart';
 import 'players.dart';
+import 'question_feedback.dart';
 
 /// An open question, regular or final. The player types an answer and picks a
 /// wager from those left this game (the final's wager was chosen before).
@@ -141,8 +143,12 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
     final canAct = ref.watch(seatInteractiveProvider);
     final locking = ref.watch(pendingIntentsProvider).containsKey('answer');
     final mine = state.you.answer;
-    final answered = state.players.where((p) => p.answered).length;
+    // A spectating host answers nothing, and isn't waited for.
+    final spectating = state.you.spectating;
+    final playing = state.playing;
+    final answered = playing.where((p) => p.answered).length;
     final canSubmit =
+        !spectating &&
         mine == null &&
         canAct &&
         !_timeUp &&
@@ -163,7 +169,7 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          if (mine == null)
+          if (mine == null && !spectating)
             FzButton(
               key: const Key('submitAnswerButton'),
               label: locking
@@ -182,7 +188,7 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
               onPressed: canSubmit ? _submit : null,
             ),
           if (state.you.host) ...[
-            if (mine == null) const SizedBox(height: 11),
+            if (mine == null && !spectating) const SizedBox(height: 11),
             if (!state.you.canReveal) ...[
               Text(
                 'Reveal opens once everyone has answered, or 5 seconds '
@@ -195,7 +201,7 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
             FzButton(
               key: const Key('revealButton'),
               label: 'Reveal the answer',
-              trailing: '$answered/${state.players.length} answered',
+              trailing: '$answered/${playing.length} answered',
               kind: FzButtonKind.pink,
               busy: ref.watch(pendingIntentsProvider).containsKey('reveal'),
               // As in the official app: once everyone has answered, or
@@ -244,7 +250,31 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
             QuestionImage(url: question.imageUrl!),
           ],
           const SizedBox(height: 22),
-          if (mine != null)
+          if (spectating)
+            FzPanel(
+              key: const Key('spectatingPanel'),
+              color: Colors.transparent,
+              borderColor: FzColors.edge,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.visibility_outlined,
+                    color: FzColors.dim,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'You’re hosting as a spectator: the players answer, '
+                      'you reveal.',
+                      style: fz.m(13, color: FzColors.dim, height: 1.4),
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else if (mine != null) ...[
             FzPanel(
               key: const Key('lockedIn'),
               color: Colors.transparent,
@@ -271,8 +301,10 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                   FzTag('wager ${mine.wager}', color: FzColors.ok),
                 ],
               ),
-            )
-          else ...[
+            ),
+            const SizedBox(height: 8),
+            QuestionFeedback(state: state),
+          ] else ...[
             FzTypingDirection(
               controller: _answer,
               child: TextField(
@@ -282,6 +314,20 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                 autofocus: !hasImage,
                 readOnly: _timeUp || !canAct || locking,
                 textInputAction: TextInputAction.done,
+                // The official app's limit; the count shows only near it.
+                maxLength: GameRules.answerMaxLength,
+                buildCounter:
+                    (
+                      context, {
+                      required currentLength,
+                      required isFocused,
+                      maxLength,
+                    }) => currentLength < GameRules.answerMaxLength - 20
+                    ? null
+                    : Text(
+                        '$currentLength/${GameRules.answerMaxLength}',
+                        style: fz.m(11, color: FzColors.dim),
+                      ),
                 style: fz.h(18, weight: FontWeight.w700),
                 // Room below for the wagers, as the field scrolls into view.
                 scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
@@ -327,14 +373,16 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
             ],
           ],
           const SizedBox(height: 22),
-          FzEyebrow('$answered of ${state.players.length} answered'),
-          if (mine != null) ...[
+          FzEyebrow('$answered of ${playing.length} answered'),
+          if (mine != null || spectating) ...[
             const SizedBox(height: 6),
-            for (final player in state.players)
+            for (final player in playing)
               PlayerRow(
                 key: ValueKey('guess-${player.peerId}'),
                 player: player,
                 you: player.peerId == state.you.peerId,
+                onTap: managePlayer(context, ref, state, player),
+                tapHint: playerMenuHint,
                 guess: player.guess,
                 note: player.guess != null
                     ? null

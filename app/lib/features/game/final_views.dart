@@ -5,10 +5,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/models/models.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/countdown.dart';
 import '../../shared/widgets/fz.dart';
 import 'game_screen.dart';
+import 'player_menu.dart';
 import 'players.dart';
 
 /// The final round's vote: an easy, medium or hard last question. Once everybody has
@@ -26,6 +28,8 @@ class FinalVoteView extends ConsumerWidget {
     final sending = pending['vote'] as String?;
     final vote = state.finalRound?.vote;
     final votes = state.finalRound?.votes ?? const {};
+    // A spectating host doesn't vote, as in the official app.
+    final spectating = state.you.spectating;
 
     // The vote cast is shown chosen, with a check, not greyed out like the
     // two left behind.
@@ -42,7 +46,7 @@ class FinalVoteView extends ConsumerWidget {
             : FzButtonKind.outline,
         selected: vote == value,
         busy: sending == value,
-        onPressed: vote == null && sending == null && canAct
+        onPressed: vote == null && sending == null && canAct && !spectating
             ? () => act(
                 context,
                 ref,
@@ -73,8 +77,13 @@ class FinalVoteView extends ConsumerWidget {
           Text('Final round', style: fz.t(40)),
           const SizedBox(height: 10),
           Text(
-            'One last question, and you wager 0, 10 or 20 on it. A wrong '
-            'answer costs what you wagered. First: how hard should it be?',
+            spectating
+                ? 'One last question, and the players wager 0, 10 or 20 on '
+                      'it. They vote for how hard it is; you’re hosting as a '
+                      'spectator.'
+                : 'One last question, and you wager 0, 10 or 20 on it. A '
+                      'wrong answer costs what you wagered. First: how hard '
+                      'should it be?',
             style: fz.m(15, color: FzColors.dim, height: 1.55),
           ),
           const SizedBox(height: 16),
@@ -88,7 +97,10 @@ class FinalVoteView extends ConsumerWidget {
           const SizedBox(height: 14),
           const FzEyebrow('Standings'),
           const SizedBox(height: 6),
-          Standings(state: state),
+          Standings(
+            state: state,
+            onTap: (p) => managePlayer(context, ref, state, p),
+          ),
         ],
       ),
     );
@@ -113,14 +125,17 @@ class FinalWagerView extends ConsumerWidget {
     final sending = pending['wager'] as int?;
     final mine = state.finalRound?.wager;
     final picked = state.finalRound?.picked;
-    final wagered = state.players.where((p) => p.finalWagered).length;
+    final playing = state.playing;
+    final wagered = playing.where((p) => p.finalWagered).length;
+    // A spectating host doesn't wager, as in the official app.
+    final spectating = state.you.spectating;
 
     return FzBody(
       footer: state.you.host
           ? FzButton(
               key: const Key('nextButton'),
               label: 'Ask the final question',
-              trailing: '$wagered/${state.players.length} wagered',
+              trailing: '$wagered/${playing.length} wagered',
               kind: FzButtonKind.pink,
               busy: pending.containsKey('next'),
               onPressed: canAct
@@ -132,10 +147,14 @@ class FinalWagerView extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           const SizedBox(height: 8),
-          Text('Your wager', style: fz.t(40)),
+          Text(spectating ? 'The wagers' : 'Your wager', style: fz.t(40)),
           const SizedBox(height: 10),
           Text(
-            picked == null
+            spectating
+                ? 'The players wager on the final question'
+                      '${picked == null ? '' : ', which is $picked'}. You’re '
+                      'hosting as a spectator.'
+                : picked == null
                 ? 'Right adds it, wrong takes it away.'
                 : 'The final question is $picked. Right adds your wager, '
                       'wrong takes it away.',
@@ -157,7 +176,8 @@ class FinalWagerView extends ConsumerWidget {
                     key: Key('finalWager-$amount'),
                     amount: amount,
                     chosen: mine == amount || sending == amount,
-                    onPressed: mine == null && sending == null && canAct
+                    onPressed:
+                        mine == null && sending == null && canAct && !spectating
                         ? () => act(
                             context,
                             ref,
@@ -179,10 +199,17 @@ class FinalWagerView extends ConsumerWidget {
               player: player,
               you: player.peerId == state.you.peerId,
               note: player.finalWagered ? 'wagered' : null,
-              trailing: Text(
-                '${player.score}',
-                style: fz.m(20, color: rank == 0 ? FzColors.ac : FzColors.ink),
-              ),
+              onTap: managePlayer(context, ref, state, player),
+              tapHint: playerMenuHint,
+              trailing: player.spectating
+                  ? null
+                  : Text(
+                      '${player.score}',
+                      style: fz.m(
+                        20,
+                        color: rank == 0 ? FzColors.ac : FzColors.ink,
+                      ),
+                    ),
             ),
         ],
       ),
@@ -201,25 +228,40 @@ class FinalScoresView extends ConsumerWidget {
     final fz = FzTheme.of(context);
     final canAct = ref.watch(seatInteractiveProvider);
     final asking = ref.watch(pendingIntentsProvider).containsKey('playAgain');
-    final standings = state.standings;
+    // A spectating host didn't play, so can't win.
+    final standings = state.standings.where((p) => !p.spectating).toList();
     final top = standings.isEmpty ? null : standings.first.score;
     final winners = standings.where((p) => p.score == top).toList();
+    final next = state.finalRound?.nextGameCode;
 
     return FzBody(
       // Anybody can ask, as in the official app; the host's asking starts
-      // the next game in the same room.
-      footer: FzButton(
-        key: const Key('playAgainButton'),
-        label: state.you.playedAgain && !state.you.host
-            ? 'Waiting for the host'
-            : 'Play again',
-        trailing: state.you.playedAgain ? null : 'same room',
-        busy: asking,
-        onPressed: state.you.playedAgain || !canAct
-            ? null
-            : () =>
-                  act(context, ref, (c) => c.playAgain(), pending: 'playAgain'),
-      ),
+      // the next game in the same room. When it started without this player,
+      // Play again joins it by its code.
+      footer: next != null
+          ? FzButton(
+              key: const Key('playAgainButton'),
+              label: 'Play again',
+              trailing: 'next game $next',
+              busy: asking,
+              onPressed: () => _joinNext(context, ref, next),
+            )
+          : FzButton(
+              key: const Key('playAgainButton'),
+              label: state.you.playedAgain && !state.you.host
+                  ? 'Waiting for the host'
+                  : 'Play again',
+              trailing: state.you.playedAgain ? null : 'same room',
+              busy: asking,
+              onPressed: state.you.playedAgain || !canAct
+                  ? null
+                  : () => act(
+                      context,
+                      ref,
+                      (c) => c.playAgain(),
+                      pending: 'playAgain',
+                    ),
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -242,10 +284,29 @@ class FinalScoresView extends ConsumerWidget {
           const SizedBox(height: 14),
           const Center(child: FzAccentBars()),
           const SizedBox(height: 30),
-          Standings(state: state),
+          Standings(
+            state: state,
+            onTap: (p) => managePlayer(context, ref, state, p),
+          ),
         ],
       ),
     );
+  }
+
+  /// The next game started without this player (Sporcle's `leave_behind`):
+  /// a seat in it, by its code, in place of this one.
+  Future<void> _joinNext(
+    BuildContext context,
+    WidgetRef ref,
+    String code,
+  ) async {
+    try {
+      await ref
+          .read(pendingIntentsProvider.notifier)
+          .run('playAgain', () => rejoinSeat(ref, code));
+    } on Object catch (error) {
+      if (context.mounted) showError(context, ref, error);
+    }
   }
 }
 

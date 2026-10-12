@@ -15,6 +15,18 @@ defmodule TriviaRelay.Sporcle.CredTest do
              Cred.new(@player)
   end
 
+  test "a name the player chose is cleaned like a handle, and shown in its place" do
+    assert {:ok, %Cred{name: "Quiz Wiz", handle: "Anis"} = cred} =
+             Cred.new(Map.put(@player, "name", " Quiz\u200B Wiz "))
+
+    assert Cred.display_name(cred) == "Quiz Wiz"
+
+    for nothing <- [nil, "", " \u202E ", 12] do
+      assert {:ok, %Cred{name: nil} = cred} = Cred.new(Map.put(@player, "name", nothing))
+      assert Cred.display_name(cred) == "Anis"
+    end
+  end
+
   test "refuses a device id the app wouldn't make, and ids of any other shape" do
     for {field, value} <- [
           {"device_id", "d3v"},

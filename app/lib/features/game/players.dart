@@ -16,6 +16,7 @@ class PlayerRow extends StatelessWidget {
     this.note,
     this.trailing,
     this.onTap,
+    this.tapHint,
     this.highlight,
     this.guess,
     this.merge = false,
@@ -26,6 +27,9 @@ class PlayerRow extends StatelessWidget {
   final String? note;
   final Widget? trailing;
   final VoidCallback? onTap;
+
+  /// What a screen reader says [onTap] does, when it isn't obvious.
+  final String? tapHint;
 
   /// What they answered, as they wrote it: its own line, at reading size, in
   /// its own direction. An empty guess shows as a dash.
@@ -45,7 +49,12 @@ class PlayerRow extends StatelessWidget {
     final notes = [
       if (you) 'you',
       if (player.host) 'host',
+      // A host who runs the game without playing.
+      if (player.spectating) 'watching',
       if (!player.connected) 'away',
+      // The sounds other players sent them (protocol/PROTOCOL.md §6.7).
+      if (player.reactions.total == 1) '1 reaction',
+      if (player.reactions.total > 1) '${player.reactions.total} reactions',
       ?note,
     ];
     final guess = this.guess;
@@ -97,6 +106,7 @@ class PlayerRow extends StatelessWidget {
     );
     if (onTap != null) {
       row = FzTile(onTap: onTap, radius: 14, child: row);
+      if (tapHint != null) row = Semantics(onTapHint: tapHint, child: row);
     }
     if (merge) row = MergeSemantics(child: row);
     final highlight = this.highlight;
@@ -123,13 +133,24 @@ class PlayerRow extends StatelessWidget {
 }
 
 /// Everybody by score, with the change a question made counting up.
+///
+/// A spectating host comes last, with no score: they aren't playing. Anybody
+/// can open the menu on anybody else ([onTap]).
 class Standings extends StatelessWidget {
-  const Standings({super.key, required this.state, this.gains = const {}});
+  const Standings({
+    super.key,
+    required this.state,
+    this.gains = const {},
+    this.onTap,
+  });
 
   final SeatState state;
 
   /// What the question just scored each player, by peer id.
   final Map<int, int> gains;
+
+  /// What tapping a player does, if anything.
+  final VoidCallback? Function(PlayerView player)? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -143,32 +164,38 @@ class Standings extends StatelessWidget {
             key: ValueKey('standing-${player.peerId}'),
             player: player,
             you: player.peerId == state.you.peerId,
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if ((gains[player.peerId] ?? 0) != 0)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 10),
-                    child: Text(
-                      _signed(gains[player.peerId]!),
-                      style: fz.m(
-                        13,
-                        color: gains[player.peerId]! > 0
-                            ? FzColors.ok
-                            : FzColors.ac2,
+            onTap: onTap?.call(player),
+            tapHint: onTap?.call(player) == null
+                ? null
+                : 'open the player menu',
+            trailing: player.spectating
+                ? null
+                : Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if ((gains[player.peerId] ?? 0) != 0)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: Text(
+                            _signed(gains[player.peerId]!),
+                            style: fz.m(
+                              13,
+                              color: gains[player.peerId]! > 0
+                                  ? FzColors.ok
+                                  : FzColors.ac2,
+                            ),
+                          ),
+                        ),
+                      FzCountUp(
+                        from: player.score - (gains[player.peerId] ?? 0),
+                        to: player.score,
+                        style: fz.m(
+                          20,
+                          color: rank == 0 ? FzColors.ac : FzColors.ink,
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                FzCountUp(
-                  from: player.score - (gains[player.peerId] ?? 0),
-                  to: player.score,
-                  style: fz.m(
-                    20,
-                    color: rank == 0 ? FzColors.ac : FzColors.ink,
-                  ),
-                ),
-              ],
-            ),
           ),
       ],
     );

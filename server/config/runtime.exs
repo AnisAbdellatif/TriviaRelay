@@ -87,6 +87,16 @@ if web_dir = System.get_env("WEB_DIR") do
   config :trivia_relay, :web_dir, web_dir
 end
 
+# The SHA-256 fingerprint(s) of the key the Android release is signed with, comma-separated
+# (`AB:CD:…`): what `/.well-known/assetlinks.json` vouches for, so that the released app
+# opens invite links itself (TriviaRelayWeb.AssetLinksController). Unset, that is a 404
+# and links open the web app.
+if prints = System.get_env("ANDROID_CERT_SHA256") do
+  config :trivia_relay,
+         :android_cert_sha256,
+         prints |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
+end
+
 # How many X-Forwarded-For entries are our own proxies' (TriviaRelayWeb.ClientIp). Only
 # believable while nothing but those proxies can reach the relay.
 if hops = System.get_env("TRUST_PROXY") do

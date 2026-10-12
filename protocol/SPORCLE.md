@@ -122,7 +122,8 @@ final round, about 3½ minutes)
   `judged_answers` (null payload). A question with no toggles still gets both.
 - **What a player sees after answering** (decompiled only, 1.5.15). Submitting moves the
   player's own screen from `GameAnswerQuestion` to `GameAnswerWait`, which lists every player
-  with their `guessText` from each `list_answers` as it arrives (hidden only for spectators).
+  with their `guessText` from each `list_answers` as it arrives (a spectating host sees only
+  who has answered).
   The correct answer and the right/wrong colours wait for `GameShowAnswer`, the host's
   `advance_all`. Once every non-spectator has answered, the app stops the timer, and the
   host's "See Answer" is enabled only then, or 5 s after time ran out. Nothing reveals on
@@ -152,11 +153,12 @@ final round, about 3½ minutes)
   `noReturn` and `reject`, disconnects, and shows "The host just ejected you" (with "Join
   Again"), "You have been kicked from this game and may not rejoin", or, for `reject` (a
   kicked player joining again), "You cannot join this game". What reaches the other
-  players, and whether Sporcle closes the socket itself, isn't known yet.
+  players isn't known yet; Sporcle does close the removed player's socket itself, with
+  close code `4000 "Eject"` (confirmed live, 2026-10-12; see "The host's player menu").
 - **Changing the pack in the lobby** (decompiled only, 1.5.15): the host sends
   `change_pack {gamePack: <the pack>}`, the catalog's map for it, and every client listens
   for `change_pack` with the same payload. The app refuses the host's own draft packs
-  (`active: false`). Other players can vote for a pack instead (`pack_votes`). The relay
+  (`active: false`). Other players vote for packs instead (see "Pack votes" below). The relay
   sends the pack as `getPack` returns it, as for `createGame`: not yet tried live, nor
   whether the sender gets `change_pack` back (the relay records it either way).
 - **The end of the final** (decompiled only, 1.5.15): on `judged_answers` during the final's
@@ -221,6 +223,218 @@ confirmed live, and matching the decompiled app)
   - **Complete snapshots.** A rejoining phone gets the whole state, including a deadline
     the relay computed, which Sporcle never sends.
 
+## Host and game flow (2026-09-29)
+
+From the decompiled bundle of the official app 1.5.15 (`sporcle_re/bundle_decompiled.js`;
+`@N` is a line in it), except where a point says it was confirmed live (the spike's frame
+logs of 2026-09-27). Nothing here was tried live from the relay yet.
+
+**Joining a game under way** (confirmed live for a rejoin during a reveal, 2026-09-27; the
+rest decompiled only, `_onGameConnect` @547907–548030)
+- The rejoining connection got `game_info` (players, `gameOptions`, **no `allRounds`**),
+  then `game_connect {inLobby: false, midRoundJoin: true, currentView: "GameShowAnswer",
+  questionIndex, question, questionText, questionCategory, timeElapsed: 35,
+  usedWagers: {"0": false, "3": false}, questions: [{questionIndex, guessText,
+  wagerAmount, answer, correct, score}], packVotes, gamePack}`, then the current
+  question's `list_answers` (live). `questions` lists the player's own answers so far,
+  the current question's included; the official app doesn't read it.
+- The official app reads `questionIndex`, `questionText`, `questionCategory`,
+  `questionImgSrc`, `currentView`, `usedWagers`, `timeElapsed` (seconds: its clock is
+  `QUESTION_SECONDS - timeElapsed`, @1689992, @1692194), and for the final `pickedVote`
+  and `judgeSubmitted`. A `questionIndex` below `QUESTIONS_PER_GAME` is the regular round
+  (`GameLoop`), otherwise the final (`FinalRound`) (@547946).
+- `currentView` values the app knows: regular `GameAnswerQuestion` (the default),
+  `GameAnswerWait` (answered, waiting), `GameShowAnswer`, `MidRoundScores` (@1689564);
+  final `VOTE_CATEGORY` (the default), `CAST_WAGER`, `wait` (wagers in), `question`,
+  `answered`, `showAnswer`, `FINAL_REVEAL`, `score` (@1710698). In the final,
+  `timeElapsed` is used only for `question` (@547980); `judgeSubmitted` goes straight to
+  the final scores (@1711275).
+- `usedWagers` is `{"<wager>": mark}`, the mark true or false once judged, null before
+  (@1688290). `list_answers.playerWagers` is the same map for the player receiving it (the
+  host's own used wagers, in the recorded game: confirmed live), and `update_wagers
+  {wagers}` replaces it (received only, @1688923). The official app disables a used wager
+  rather than hiding it; on a timeout it spends the first unused one (@1689209).
+- `allRounds` appears nowhere in the bundle: the official app ignores it (`onGameInfo`
+  @292722 copies `gameOptions` and resets nothing).
+
+**The start** (decompiled only)
+- The host's "Start the Game" (@1644718) asks "Not all players are ready." / "Start
+  anyways?" when any player (the host included) isn't `readyForGame` (@1641455), then
+  sends `start_game` with no payload (@1641410). The button waits for everyone ready, or
+  30 s after the lobby opened, and needs a second player (@1644262); the relay doesn't
+  enforce those two.
+- Every client, the host's included, answers the first `game_question` in the lobby with a
+  local 5 s "We're starting in" count down (`CountdownModal`, @1642810, @1754449), and only
+  then shows the question and starts its clock. There is no count down event. The final
+  question gets a 3 s "Final question in" the same way (@1711923).
+
+**Hosting as a spectator** (decompiled only)
+- The `SPECTATE` option (default false, @549711) is the switch "Host this game as a
+  spectator" in the pack screen's "More options" (@547182), and "Host the game as a
+  spectator" in the lobby's and the game's settings (@607982). It goes in `createGame`'s
+  `gameOptions`, in the host's login (`spectate` and `gameOptions`, @548818), and later
+  in `edit_options` with every other option (@607319). Only a host can spectate.
+- A spectating host never answers: their question view starts at `GameAnswerWait`
+  (@1688198), `forceSubmit` does nothing (@1689212), and other players' guesses show as
+  "Answered" until the reveal (`hideAnswers`, @1689517, @1693150). They still reveal
+  ("See Answer", waiting only for the non-spectators, @1689730), judge, and move on. In the
+  final they neither vote (@1710911) nor wager (@1713790). Everyone's "all answered/
+  wagered" counts skip spectators (@1711575); scores list them last with "Hosting"
+  instead of a score (@1696163), and they can't win (@1707711).
+
+**The host's player menu** (decompiled only; `UtilityModal.getActions` @1649199)
+- Host only, never on oneself (@1648668), not on a disconnected player (@1649221), in any
+  phase: the lobby, the question, the scoreboards and the final (@1644732, @1693182,
+  @1707689, @1711048).
+- "Make Host" asks "Promote <name> to Host?" and sends `promote_new_host {peerId}`
+  (@1647571). The old host waits for the `player_update` about itself; the new host gets
+  `promote_to_host {oldHostLeft}` and a banner "You're the new host!" / "The host has
+  promoted you." (or "The host has left the game.") (@293357).
+- "Eject" ("They will be able to rejoin") and "Kick" ("They will not be able to rejoin")
+  ask "Eject/Kick <name> from the Game?" and send `bounce {peerId, playerId, noReturn}`
+  (@1647491). Other players get no bounce-specific event; the official app drops a
+  disconnected player from its list (@292866), which suggests a `player_disconnect`.
+
+**The server does not check that these come from the host** (confirmed live, 2026-10-12,
+a `private` game with two of our accounts). The menu is host-only in the official app, but
+the server enforces nothing:
+- A non-host sent `promote_new_host {peerId: <its own peer>}` and the server made it host:
+  it got `promote_to_host {oldHostLeft: false}`, and a `player_update` with `isHost: true`
+  for that peer went to everyone, the old host included. So any client can seize host.
+- A non-host's `bounce {peerId: <a player>}` was honoured. The removed player received
+  `bounce {gameCode, noReturn}` (not the `peerId`/`playerId` the sender named), and Sporcle
+  then **closed that player's socket itself** with WebSocket close code `4000 "Eject"` (the
+  earlier open question — whether Sporcle closes the socket — is answered: it does).
+- Both reach a player through `sendTo` as well, so the sender need not even be in the game's
+  player list as a host. The relay drops any game event that arrives from a peer rather than
+  the server (see PROTOCOL/`Seat`), since that is the only sign it has of a forgery.
+
+**Back to the lobby** (decompiled only)
+- The host's "Go to Lobby" in the game's settings (@607019) asks "Are you sure you want to
+  return to the lobby?" and sends `go_to_lobby` with no payload (@607052). Every client
+  that receives `go_to_lobby` resets to the lobby with its payload (the pack at least); the
+  others first show "Returned to Lobby" / "The Host returned everyone to the Game Lobby"
+  (@293449).
+
+**Banners** (decompiled only)
+- `server_message {type, title, message, interval}` on the game socket (@293319) shows as
+  the in-app banner: `type` `info`, `warn`, `error` or `success` colours its border,
+  `interval` is how long it shows in ms (0: until dismissed), default 4750 (@1753594). A
+  message without `interval` hides at once, in the official app.
+
+**Pack votes** (decompiled only)
+- In the lobby, a non-host's "Vote for Packs" opens the pack browser, where a tap votes
+  for a pack (@1645445, @1627848): `vote_on_pack {gamePack}` with the whole pack, or
+  `{gamePack, unvote: true}` to take it back (@1642012, @1642032). At most
+  `MAX_PACK_VOTES` (5) packs per player per game (@549723, "You can vote for up to 5
+  packs, per game."), never one's own draft (@1641943).
+- Everyone gets `pack_votes {packVotes: {<packId>: {gamePack, voters: [playerId]}}}`
+  (@1642890); `game_connect` and `next_game` carry `packVotes` too. The lobby's "N Pack
+  Votes" button opens "Voted Packs", most voted first (@1752610); the host's tap on one
+  sends `change_pack` (@1641740).
+
+**Rating and reporting a question** (decompiled only)
+- Once answered and while revealed (`GameAnswerWait`, `GameShowAnswer`, and the final's
+  `answered` and `showAnswer`, @1690124, @1713319), a thumb up or down sends
+  `rate_question {questionIndex, rating}`, 1 or -1, and tapping it again 0 (@1691027). As
+  written, the official app sends the rating from before the tap, and no `questionIndex`
+  in the final; the relay sends the new rating and the index. Nothing comes back.
+- "Report Question" / "Find something wrong with this question?" offers "Inaccurate",
+  "Typo / Spelling" and "Offensive Content", sent as `report_question {questionIndex,
+  reason}` with `inaccurate`, `typo` or `offensive` (@1705257, @1705367). No reply.
+
+**Answers** (decompiled only)
+- `ANSWER_MAX_LENGTH` is 80 (@549716), the answer field's `maxLength` for the regular and
+  the final question; the answer is trimmed when sent (@1689161).
+
+**Play again and `leave_behind`** (decompiled only)
+- The final scoreboard listens for `next_game`, `leave_behind`, `change_pack` and
+  `list_answers` (@1707811). `leave_behind {gameCode}` stores the code and disconnects
+  (@1708000); "Play Again" then joins that game: `joinGame {gameCode, location:
+  "play_again"}` (@1707510). Without one it sends `play_again` (no payload), host or not,
+  and waits for `next_game` (@1707480). A non-host playing again on a pack with pictures
+  needs a popper (@1707404). Who gets `leave_behind` isn't known; presumably the players
+  who hadn't pressed Play Again when the next game started.
+- `joinGame`'s `location` is `code_field`, `link`, `room_list`, `play_again` or
+  `reconnect` (@1608761, @1609811, @1610516, @1707510, @291865). It looks like analytics
+  (the app logs it); the relay's joins send none, and they work (confirmed live).
+- Players carry `readyForNextGame` (confirmed live, true for both players mid-game); the
+  official app never reads it.
+
+## Chat and reactions (decompiled only, 1.5.15)
+
+None of this has been tried live, except where it says so. `@N` is a line of
+`~/dev/sporcle_re/bundle_decompiled.js`.
+
+**The envelope, and messages for one player**
+- The game socket's client is GameLift Realtime's (`RTSClient` @1763898). Its `Packet`
+  (@1772330–1772640) has f1 opcode, f2 sequence number, f3 target player, f4 target group,
+  f5 sender, f6 reliable, f7 client version, f15 payload; `PLAYER_ID_SERVER` is 4294967295
+  (@1771373), -1 as an int32, the f3 every game message carries. `send(event, payload)`
+  targets the server; `sendTo(peer, event, payload)` (@1764100) is the same packet with
+  the peer's id in f3 and the app's own peer id in f5, for that player alone. As
+  decompiled, both set opcode 100 where the captured app sent 200 (and f5 8, its peer then);
+  the relay keeps the captured 200 for both, and sends its own peer as f5.
+- Messages from the server carry the receiving peer in f3 and -1 in f5 (confirmed live).
+
+**Chat** (the `MessageBoard` screen @1721639, GiftedChat)
+- Opening the chat screen sends `chat_open` (no payload), closing it `chat_close`
+  (@1722139, @1722178). While open it listens for `chat_load`, `chat_message`,
+  `chat_typing` and `chat_load_more`. The game screen listens for `chat_has_message` all
+  the time (@294424), which only sets a red dot on the chat button
+  (`chatHasUnreadMessages`, @293434); `chat_load` clears it (@1722222). The chat button
+  (`MessageBoardButton` @1646065) also listens for `last_chat_message {message}`, shown as
+  "name: text" on the button, and `chat_typing`, which animates it.
+- `chat_load {messages, hasMore}` replaces the history (@1722200); `chat_load_more
+  {messages, hasMore}` is older messages, prepended, in answer to `chat_load_more {page}`
+  (@1721716), `page` counting 1, 2, … from the first. GiftedChat keeps messages newest
+  first, so these lists presumably are too.
+- A message is GiftedChat's: `{_id, text, createdAt, user, image?, system?}`. Sending
+  (`onSend` @1721760) is `chat_message {message}` with the message as GiftedChat made it:
+  a random `_id`, `createdAt` a date, and `user: {_id: getUserId() ("sporcle_id//<id>",
+  @508460), peerId, name: teamName, mascotType, mascotCustomImageUrl, hatType, showHat:
+  true, isHost}` (@1722950). The app adds it to its own list: Sporcle is not expected to
+  send it back. The keyboard's GIFs go as `image` (a link) with the text. Received:
+  `chat_message {message}`; the sender stops showing as typing.
+- The field takes 256 characters (`maxLength`, `maxInputLength` @1723030) on one line, and
+  the text is trimmed as it is sent. No moderation or filtering field is read anywhere;
+  `system` messages (GiftedChat's) are drawn apart (@1722470).
+- Typing: `chat_start_typing` (debounced 500 ms, leading) and `chat_stop_typing`
+  (debounced 600 ms, trailing) as the field changes (@1721844, @1721869), no payloads.
+  `chat_typing {whoseTyping: {<user id>: <name>}}` is the whole list; the app leaves itself
+  out and shows up to three names, then "N more", "is/are typing..." (@1722080).
+- Where: the chat button is on the lobby (@1644439), the list of players after answering
+  and at the reveal (`PlayerList` @1693938, in `GameAnswerWait`), and the scoreboards
+  (`PlayerScores` @1697394: between questions, the final's wager, answered and reveal
+  views, the final scoreboard). Not while answering a question, nor on the final's vote.
+
+**Reactions** (the player menu's "Your Sounds", @1647370–1647440)
+- A sound is sent in two parts: `honk {peerId: <own peer>, honk_type: <type>}` with
+  `sendTo` the player's peer (throttled to one every 2 s, leading, and played on the
+  sender's phone too), then `send_u2u {playerId, peerId, type}` to the server, naming the
+  player (throttled to one every 125 ms).
+- Received: the game screen plays `honk_type` unless `peerId` is its own peer, at most one
+  every 250 ms (`onHonk` @292110); the sender's mascot shakes wherever it shows (@392117).
+- Sounds: `goose` (the Honk) is free and always offered; the rest come in paid packs
+  (`SOUND_PACKS` @549890): `party.sound_pack.1` cow, donkey, goat, rooster, sheep;
+  `.2` aww, clap, laugh, ooh, soccer_cheer; `.3` accordion, rim_shot, trombone, trumpet,
+  tuba. The menu offers the goose and the player's own packs (`getSoundPacks` →
+  `{mySoundPacks, lockedSoundPacks}`, @1647315); the relay sends only the goose.
+- `list_u2u {u2u, u2uPerf}` is taken whole into the screen's state (`onListU2U` @1642729,
+  @1688549, @1711459): `u2u` is by the player id who received, each `{total, stream,
+  byType}`, `stream` being the latest as `"<type>-<id>"` and `byType[type].players` who
+  sent them. Every list of players shows each player's `stream` and `total` (`PlayerU2U`
+  @1651091), and a tap opens who sent what (`PlayerU2UModal` @1654591). `u2uPerf
+  {animate, disable}` turns the animation off.
+- Players carry `honksMap` (`{}` in every live game logged, confirmed live); nothing in
+  the bundle reads it. The profile's "Honks Sent" and "Honks Received" (@1666403) are
+  REST statistics.
+
+**Party Poppers spent**
+- `popper_spent` (no payload read, `onPopperSpent` @1688562): the game screen shows
+  "Popper Spent" / "You used 1 Popper to join this image party. Let the fun begin!" and
+  takes one off its count.
+
 ## Login: email + password → Party credentials (confirmed live 2026-09-28)
 
 Captured from the official app (`RE/find_connect.py`) after its old login path stopped
@@ -248,12 +462,99 @@ and, in the relay/app, the wrong user agent. Implemented in
 `sporcle_scraper/sporcle/auth.py` (`party_login`), `server/…/sporcle/login.ex`, and
 `app/…/sporcle/sporcle_login.dart`.
 
+## Around the game: packs, Party Poppers, friends, names (decompiled only, 1.5.15)
+
+None of this has been tried live. `@N` is a line of `~/dev/sporcle_re/bundle_decompiled.js`.
+Every call below is on the Party API (`party.sporcle.com/api/party`, the same axios
+instance and headers as `searchPacks`), and answers its payload as the body.
+
+**Packs**
+- `POST /bookmarkPack {pack_id, bookmarked}` (@505723) and `POST /subscribePack {pack_id,
+  subscribed}` (@507915). Both call sites of each (@544339, @1641654 for bookmarks; @544079
+  for subscriptions) send the pack's flag *as it was before the tap* and then flip it
+  locally, so Sporcle must turn it over: `bookmarked: false` bookmarks. The relay sends the
+  opposite of what it is asked for. Any failure of a bookmark is shown as "You have reached
+  the limit of pack bookmarks". A subscription asks for push permission first: it is
+  "notify me when someone starts a party in this pack", delivered as a push to the
+  official app.
+- A pack carries the player's own `bookmarked` and `subscribed` (confirmed live in the
+  `gamePack` a `createGame` sent, which is `getPack`'s map with the host's flags).
+- `POST /reportPack {pack_id, player_id, reason, extraInfoText}` (@507330). The pack
+  screen's form (@552389) offers `harassment`, `offensive`, `spam`, `inaccurate`, `other`,
+  requires a reason and some text (at most 200 characters), and sends no `player_id`. The
+  in-game menu (@1610420) reports the game's pack with `player_id` = the host and
+  `reason: "admin_delete"`, which reads as a moderator's tool.
+- `GET /getRandomPack` (@506219), no parameters, answers `{pack}`. The pack screen shows
+  it; the lobby's "Load a Random Pack" (@1645548, @1642117) checks it with `canHostPack`
+  and switches to it.
+
+**Party Poppers**
+- `joinGame` answers `popper_count` and `popper_last_claim` beside the session (confirmed
+  live for the count), or, instead of a session, `denied: {code, message}`. The codes the
+  join screen handles (@291950–292000): `NeedLogin`, `Blocked` (with `audienceType`),
+  `BuyPopper` ("Insufficient Poppers to join this image party", @291993), `GameNotFound`
+  ("Looks like that Party is no longer going"), `GameFull`. `BuyPopper` opens the popper
+  store (@548346).
+- A non-host pays one Popper per game with images (the store's text, @1686731). The game
+  screen listens for `popper_spent` (@1688421, handler @1688562): it takes one off the
+  count and says "You used 1 Popper to join this image party". It is registered on the
+  question screen, so the Popper is spent when play starts, not at the join.
+- `POST /claimPoppers` (@505859), no body, answers `{popper_count, popper_last_claim}`
+  (@1757664). `popper_last_claim` is Unix seconds; the store counts one claimable Popper
+  per 14400 s since it, up to 5 minus the count (@1757930). Refills also come from a
+  rewarded video (`deliverReward {type: "popper_rewarded_video"}`) and purchases, neither
+  of which the relay offers.
+- The official app also reads the count from `saveUser`'s answer at start-up (@294770);
+  `saveUser` writes the profile, so the relay doesn't call it for that.
+
+**Friends**
+- `GET /getFriends?page=<n>` (@506471) answers `{friends}`, a map by the id an invitation
+  takes, each a player (`playerId`, `sporcleHandle`, `teamName`, `friendStatus:
+  {is_friend, sent, received}`, @1748605).
+- `POST /inviteToGame {friend_uid, game}` (@507155) and `POST /inviteAllFriendsToGame
+  {game}` (@507121), `game` being `{gameCode, gamePack: {id, name, img_src}}` (@1747700,
+  @1642544). Plain REST with the player's credentials: nothing goes over the SigV4 social
+  socket. "Invite all" in the friends list invites each friend one by one; the lobby sends
+  `inviteAllFriendsToGame` once when the host asked to notify friends.
+
+**Names**
+- Edit Profile (@1574133) trims the team name, asks `GET /getHandleHasBadWords?handle=`
+  (@506555, answers `{handle_has_bad_words}`), and refuses with "Invalid handle" when it is
+  true. Otherwise it sends `player_update {teamName, …}` to the game it is in and saves it
+  with `saveUser {fields: {team_name, …}}` (@507534).
+- Players are shown by `teamName`, falling back to `sporcleHandle`, with "@" +
+  `sporcleHandle` under it (@1665256, @1667399, @1648755). So `teamName` is the name to
+  choose, and `sporcleHandle` stays the account's handle. The relay's login sends the
+  player's chosen name as `teamName` only.
+
+**Also seen**: the lobby's share is "Join My … Game!" and `<homepage>/join/<code>`
+(@1641825); the official app keeps the screen awake from the game socket's `connect` to its
+close (`activateKeepAwake`, @294417).
+
 ## Still open
 - `edit_options` in the lobby, `bounce` (kick) and `promote_new_host`, all untried live.
   For `bounce`, what the removed player receives (the decompiled client reads only
-  `noReturn` and `reject`) and what the others see.
+  `noReturn` and `reject`) and what the others see; for `promote_new_host`, whether the old
+  host gets a `player_update` about itself.
+- `go_to_lobby`: its payload as received (the pack, `packVotes`?), and whether the host gets
+  it back.
+- `game_connect` for a late join mid-question (the `currentView` then, and whether
+  `timeElapsed` counts from the question's arrival or from the end of the start's count
+  down), and during the final.
+- `server_message`, `update_wagers`, `pack_votes`, `vote_on_pack`, `rate_question`,
+  `report_question`, `leave_behind`: none seen live. Whether Sporcle takes a
+  `rate_question` of 0 as "no rating".
+- `SPECTATE` in the login and in `edit_options`, and what everybody's `player_update`
+  says after it changes.
 - A player dropping and rejoining during the final round and during judging (only mid-question
   was tested).
 - The host: what happens when the host drops and rejoins, and what a host this client was
   promoted to has to send to carry on.
-- Chat and poppers, and a game longer than 20 minutes.
+- Chat, reactions and poppers, none seen live: whether Sporcle sends `chat_message` only to
+  players with the chat open, whether it sends a player's own message back, the order and
+  page size of `chat_load` and `chat_load_more`, whether `last_chat_message` comes for
+  every message, what `createdAt` looks like as received, whether a `honk` sent with
+  `sendTo` reaches only its target (and whether the server needs opcode 100 for it), what
+  `list_u2u` carries and when, whether the server checks that a sender owns a paid sound,
+  and what `honksMap` holds.
+- A game longer than 20 minutes.

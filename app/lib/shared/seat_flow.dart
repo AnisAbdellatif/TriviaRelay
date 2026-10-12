@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../core/models/models.dart';
 import '../core/providers/account_providers.dart';
 import '../core/providers/connection_providers.dart';
+import '../core/providers/settings_providers.dart';
 import '../features/game/game_screen.dart';
 import 'describe_error.dart';
 import 'navigation.dart';
@@ -19,6 +20,7 @@ Future<void> openSeat(
   Future<SeatTicket> Function() take,
 ) async {
   final ticket = await take();
+  unawaited(ref.read(poppersProvider.notifier).heard(ticket.poppers));
   await ref.read(currentSeatProvider.notifier).set(ticket);
   if (!context.mounted) return;
   await attachSeat(context, ref, ticket);

@@ -12,6 +12,7 @@ _SporcleAccount _$SporcleAccountFromJson(Map<String, dynamic> json) =>
       token: json['token'] as String,
       handle: json['handle'] as String,
       deviceId: json['device_id'] as String,
+      displayName: json['display_name'] as String?,
     );
 
 Map<String, dynamic> _$SporcleAccountToJson(_SporcleAccount instance) =>
@@ -20,12 +21,14 @@ Map<String, dynamic> _$SporcleAccountToJson(_SporcleAccount instance) =>
       'token': instance.token,
       'handle': instance.handle,
       'device_id': instance.deviceId,
+      'display_name': instance.displayName,
     };
 
 _SeatTicket _$SeatTicketFromJson(Map<String, dynamic> json) => _SeatTicket(
   seatId: json['seat_id'] as String,
   seatToken: json['seat_token'] as String,
   gameCode: json['game_code'] as String,
+  poppers: (json['poppers'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$SeatTicketToJson(_SeatTicket instance) =>
@@ -33,6 +36,7 @@ Map<String, dynamic> _$SeatTicketToJson(_SeatTicket instance) =>
       'seat_id': instance.seatId,
       'seat_token': instance.seatToken,
       'game_code': instance.gameCode,
+      'poppers': instance.poppers,
     };
 
 _PackSummary _$PackSummaryFromJson(Map<String, dynamic> json) => _PackSummary(
@@ -43,6 +47,8 @@ _PackSummary _$PackSummaryFromJson(Map<String, dynamic> json) => _PackSummary(
   numQuestions: (json['num_questions'] as num?)?.toInt(),
   hasImages: json['has_images'] as bool? ?? false,
   playCount: (json['play_count'] as num?)?.toInt(),
+  bookmarked: json['bookmarked'] as bool?,
+  subscribed: json['subscribed'] as bool?,
 );
 
 Map<String, dynamic> _$PackSummaryToJson(_PackSummary instance) =>
@@ -54,6 +60,8 @@ Map<String, dynamic> _$PackSummaryToJson(_PackSummary instance) =>
       'num_questions': instance.numQuestions,
       'has_images': instance.hasImages,
       'play_count': instance.playCount,
+      'bookmarked': instance.bookmarked,
+      'subscribed': instance.subscribed,
     };
 
 _HostOptions _$HostOptionsFromJson(Map<String, dynamic> json) => _HostOptions(
@@ -62,6 +70,7 @@ _HostOptions _$HostOptionsFromJson(Map<String, dynamic> json) => _HostOptions(
   audience:
       $enumDecodeNullable(_$AudienceEnumMap, json['audience']) ??
       Audience.private,
+  spectate: json['spectate'] as bool? ?? false,
 );
 
 Map<String, dynamic> _$HostOptionsToJson(_HostOptions instance) =>
@@ -69,6 +78,7 @@ Map<String, dynamic> _$HostOptionsToJson(_HostOptions instance) =>
       'questions_per_game': instance.questionsPerGame,
       'question_seconds': instance.questionSeconds,
       'audience': _$AudienceEnumMap[instance.audience]!,
+      'spectate': instance.spectate,
     };
 
 const _$AudienceEnumMap = {

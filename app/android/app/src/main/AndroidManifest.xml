@@ -36,6 +36,21 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- Invite links, https://<relay>/join/<code> (protocol/PROTOCOL.md §3.8):
+                 the relay the build was made for (build.gradle.kts, from SERVER_URL).
+                 Android opens them here once the relay's /.well-known/assetlinks.json
+                 vouches for this app's signing key; until then, in the browser, where
+                 the relay serves the web app. Flutter hands the path over as a route
+                 (lib/main.dart), and nothing joins until the person says so. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data
+                    android:scheme="https"
+                    android:host="${inviteLinkHost}"
+                    android:pathPrefix="/join/"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

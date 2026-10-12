@@ -636,7 +636,11 @@ void main() {
     expect(find.textContaining('Invite copied'), findsOneWidget);
     expect(copied, [
       {'text': '624949'},
-      {'text': 'Join my Trivia Relay game: code 624949'},
+      {
+        'text':
+            'Join my Trivia Relay game: http://localhost:4100/join/624949 '
+            '(code 624949)',
+      },
     ]);
   });
 

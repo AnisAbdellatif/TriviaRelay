@@ -67,4 +67,19 @@ defmodule TriviaRelay.Sporcle.UpstreamTest do
     for secret <- ~w(psess-secret device-secret my-guess), do: refute(text =~ secret)
     assert text =~ "seat1" and text =~ "answer_question"
   end
+
+  test "a message for one player's status report names only the event" do
+    status =
+      Upstream.format_status(%{
+        state: :whatever,
+        message: {:"$gen_cast", {:send_to, 5, 2, "honk", %{peerId: 2, honk_type: "secret"}}}
+      })
+
+    assert status.message == {:"$gen_cast", {:send_to, "honk"}}
+  end
+
+  test "a message for one player before the socket is up is dropped, as any send" do
+    assert {:noreply, %{ws: nil}} =
+             Upstream.handle_cast({:send_to, 5, 2, "honk", %{}}, %{ws: nil})
+  end
 end

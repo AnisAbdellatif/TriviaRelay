@@ -8,7 +8,8 @@ defmodule TriviaRelay.Sporcle.Upstream do
   its owner what arrives:
 
     * `{:upstream, label, :connected}` once the login is sent
-    * `{:upstream, label, {:event, name, payload}}` for each game message
+    * `{:upstream, label, {:event, name, payload, sender}}` for each game message
+      (`sender` is `-1` from Sporcle's server, the sending peer from a `sendTo`, or `nil`)
     * `{:upstream, label, {:frame, fields}}` for a frame that is not a game message
     * `{:upstream, label, {:closed, reason}}` when the connection ends, just before
       this process stops
@@ -49,6 +50,14 @@ defmodule TriviaRelay.Sporcle.Upstream do
   would.
   """
   def cast_event(pid, event, payload \\ :none), do: GenServer.cast(pid, {:send, event, payload})
+
+  @doc """
+  Sends `[event, payload]` to one player only, peer `target`, from peer `sender` (this
+  connection's own): the official app's `sendTo`, as a honk goes. Without waiting, like
+  `cast_event/3`.
+  """
+  def cast_event_to(pid, target, sender, event, payload),
+    do: GenServer.cast(pid, {:send_to, target, sender, event, payload})
 
   @doc "Cuts the TCP connection with no WebSocket close: what a phone losing signal looks like."
   def drop(pid), do: GenServer.cast(pid, :drop)
@@ -105,6 +114,19 @@ defmodule TriviaRelay.Sporcle.Upstream do
 
   @impl true
   def handle_cast({:send, _event, _payload}, %{ws: nil} = s), do: {:noreply, s}
+
+  def handle_cast({:send_to, _target, _sender, _event, _payload}, %{ws: nil} = s),
+    do: {:noreply, s}
+
+  def handle_cast({:send_to, target, sender, event, payload}, s) do
+    frame = Envelope.game_to(target, sender, event, payload)
+    log_out(s, %{kind: "game", event: event, payload: payload, target: target}, frame)
+
+    case send_frame(s, {:binary, frame}) do
+      {:ok, s} -> {:noreply, s}
+      {:error, s, reason} -> finish(s, {:send_failed, reason})
+    end
+  end
 
   def handle_cast({:send, event, payload}, s) do
     case send_game(s, event, payload) do
@@ -244,9 +266,14 @@ defmodule TriviaRelay.Sporcle.Upstream do
   # The relay keeps no log: the hex and the envelope fields are only worked out for one.
   defp inbound(%{log: nil} = s, body) do
     case Envelope.decode(body) do
-      {:ok, %{event: nil, fields: fields}} -> notify(s, {:frame, fields})
-      {:ok, %{event: event, payload: payload}} -> notify(s, {:event, event, payload})
-      :error -> :ok
+      {:ok, %{event: nil, fields: fields}} ->
+        notify(s, {:frame, fields})
+
+      {:ok, %{event: event, payload: payload, sender: sender}} ->
+        notify(s, {:event, event, payload, sender})
+
+      :error ->
+        :ok
     end
   end
 
@@ -263,7 +290,7 @@ defmodule TriviaRelay.Sporcle.Upstream do
 
         notify(s, {:frame, fields})
 
-      {:ok, %{event: event, payload: payload, fields: fields}} ->
+      {:ok, %{event: event, payload: payload, fields: fields, sender: sender}} ->
         FrameLog.write(s.log, s.label, "in", %{
           kind: "game",
           event: event,
@@ -272,7 +299,7 @@ defmodule TriviaRelay.Sporcle.Upstream do
           hex: hex
         })
 
-        notify(s, {:event, event, payload})
+        notify(s, {:event, event, payload, sender})
 
       :error ->
         FrameLog.write(s.log, s.label, "in", %{kind: "undecodable", hex: hex})
@@ -360,6 +387,7 @@ defmodule TriviaRelay.Sporcle.Upstream do
   defp tag({:"$gen_call", _from, request}), do: {:"$gen_call", tag(request)}
   defp tag({:"$gen_cast", request}), do: {:"$gen_cast", tag(request)}
   defp tag({:send, event, _payload}), do: {:send, event}
+  defp tag({:send_to, _target, _sender, event, _payload}), do: {:send_to, event}
   defp tag(message) when is_tuple(message) and tuple_size(message) > 0, do: elem(message, 0)
   defp tag(message) when is_atom(message), do: message
   defp tag(_message), do: :redacted

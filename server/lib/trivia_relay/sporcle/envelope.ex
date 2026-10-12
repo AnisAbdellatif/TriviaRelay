@@ -9,9 +9,17 @@ defmodule TriviaRelay.Sporcle.Envelope do
     * game message: f1 opType (200), f3 target (-1), f5 8, f6 1, f7 2, f15 JSON
     * login:        no f1; f3 -1, f6 1, f7 2, f15 player JSON, f30 {f1 PlayerSessionId}
 
-  Server messages have the same shape, with f3 carrying the sender's peer id.
-  Only f15 is interpreted; `decode/1` keeps every field it finds, so a frame that
-  is not a game message still reaches the log whole.
+  The fields are GameLift Realtime's `Packet` (decompiled, `com.gamelift.rt.proto.Packet`
+  in the official app's bundle): f1 opcode, f2 sequence number, f3 target player, f4
+  target group, f5 sender, f6 reliable, f7 client version, f15 payload. A target of -1
+  is `PLAYER_ID_SERVER` (0xFFFFFFFF as an int32): the game server, which passes the
+  event on to everyone. A peer id as the target is the official app's `sendTo`, a
+  message for that one player only (`game_to/4`). The f5 of 8 is what the captured
+  official app sent as its sender; Sporcle ignores it on messages to the server.
+
+  Server messages have the same shape, with f3 the receiving peer and f5 -1 (the
+  server) (confirmed live). Only f15 is interpreted; `decode/1` keeps every field it
+  finds, so a frame that is not a game message still reaches the log whole.
   """
 
   import Bitwise
@@ -31,6 +39,23 @@ defmodule TriviaRelay.Sporcle.Envelope do
       field(6, 1),
       field(7, 2),
       bytes(15, json)
+    ])
+  end
+
+  @doc """
+  A game message for one player: `[event, payload]` to peer `target`, from peer `sender`
+  (this connection's own), as the official app's `sendTo` sends a honk. The game server
+  delivers it to that player alone.
+  """
+  def game_to(target, sender, event, payload)
+      when is_integer(target) and target > 0 and is_integer(sender) do
+    frame([
+      field(1, @op_game),
+      field(3, target),
+      field(5, sender),
+      field(6, 1),
+      field(7, 2),
+      bytes(15, Jason.encode!([event, payload]))
     ])
   end
 
@@ -71,21 +96,33 @@ defmodule TriviaRelay.Sporcle.Envelope do
   end
 
   @doc """
-  Decodes one message body into `%{fields: [...], event: ..., payload: ...}`.
+  Decodes one message body into `%{fields: [...], event: ..., payload: ..., sender: ...}`.
 
   `fields` is every field in order as `{number, value}`: an integer for a varint
   (field 3 read as signed, since -1 means "everyone"), a binary for a
   length-delimited field. `event` and `payload` come from field 15 when it holds a
   JSON array, and are nil otherwise.
+
+  `sender` is field 5 read signed: `-1` on a message from Sporcle's server (confirmed
+  live), the sending peer's id (a positive integer) on a `sendTo` from another player,
+  and `nil` when the field is absent. The seat uses it to tell a server message from a
+  forged peer-to-peer one.
   """
   def decode(body) do
     case fields(body) do
       {:ok, fields} ->
         {event, payload} = game_event(List.keyfind(fields, 15, 0))
-        {:ok, %{fields: fields, event: event, payload: payload}}
+        {:ok, %{fields: fields, event: event, payload: payload, sender: sender(fields)}}
 
       :error ->
         :error
+    end
+  end
+
+  defp sender(fields) do
+    case List.keyfind(fields, 5, 0) do
+      {5, value} when is_integer(value) -> signed(value)
+      _ -> nil
     end
   end
 

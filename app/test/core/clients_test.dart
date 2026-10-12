@@ -49,6 +49,7 @@ void main() {
             'questions_per_game': 5,
             'question_seconds': 15,
             'audience': 'private',
+            'spectate': true,
           });
           return http.Response(
             '{"seat_id":"s","seat_token":"t","game_code":"1"}',
@@ -59,7 +60,11 @@ void main() {
       await api.host(
         account,
         7,
-        const HostOptions(questionsPerGame: 5, questionSeconds: 15),
+        const HostOptions(
+          questionsPerGame: 5,
+          questionSeconds: 15,
+          spectate: true,
+        ),
       );
     });
 

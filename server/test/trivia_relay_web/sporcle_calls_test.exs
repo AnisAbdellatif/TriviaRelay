@@ -101,6 +101,51 @@ defmodule TriviaRelayWeb.SporcleCallsTest do
 
       assert calls.() == 5
     end
+
+    test "a kept list says nothing of the player it was asked for", %{conn: conn} do
+      counting(%{"data" => %{"packs" => [%{"id" => 1, "bookmarked" => true}]}})
+
+      for id <- ["p1", "p2"] do
+        assert %{"packs" => [%{"id" => 1, "bookmarked" => nil, "subscribed" => nil}]} =
+                 conn
+                 |> as(id, "t")
+                 |> get(~p"/api/packs?list=popular")
+                 |> json_response(200)
+      end
+
+      # A player's own list, never kept, says it.
+      assert %{"packs" => [%{"bookmarked" => true}]} =
+               conn
+               |> as("p1", "t")
+               |> get(~p"/api/packs?list=bookmarked")
+               |> json_response(200)
+    end
+
+    test "a pack and a random one are asked every time", %{conn: conn} do
+      calls = counting(%{"pack" => %{"id" => 9, "name" => "Nine", "bookmarked" => true}})
+
+      for path <- [~p"/api/packs/9", ~p"/api/packs/9", ~p"/api/packs/random"] do
+        assert %{"pack" => %{"id" => 9, "bookmarked" => true}} =
+                 conn |> as("p1", "t") |> get(path) |> json_response(200)
+      end
+
+      assert calls.() == 3
+    end
+  end
+
+  describe "friends" do
+    @friends %{"friends" => %{"f1" => %{"sporcleHandle" => "ana"}}}
+
+    test "are kept a few seconds for the same credentials, never anybody else's", %{conn: conn} do
+      calls = counting(@friends)
+
+      for _ <- 1..2, id <- ["p1", "p2"] do
+        assert %{"friends" => [%{"id" => "f1"}]} =
+                 conn |> as(id, "t") |> get(~p"/api/friends") |> json_response(200)
+      end
+
+      assert calls.() == 2
+    end
   end
 
   describe "calls to Sporcle" do

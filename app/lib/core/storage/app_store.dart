@@ -7,7 +7,9 @@ import '../models/models.dart';
 
 /// What the app keeps on the device: the signed-in account's Party
 /// credentials, this install's device id, and the seat it was last in, so an
-/// app that was closed mid-game can go back to it. Never a password.
+/// app that was closed mid-game can go back to it; the app's settings, and by
+/// player the name they chose to be seen by and their last known Party
+/// Poppers. Never a password.
 ///
 /// On Android none of it is in a backup or a transfer to a new phone
 /// (android/app/src/main/AndroidManifest.xml).
@@ -15,6 +17,9 @@ class AppStore {
   static const _accountKey = 'trivia_relay.account';
   static const _deviceKey = 'trivia_relay.device_id';
   static const _seatKey = 'trivia_relay.seat';
+  static const _settingsKey = 'trivia_relay.settings';
+  static const _namesKey = 'trivia_relay.display_names';
+  static const _poppersKey = 'trivia_relay.poppers';
 
   Future<SporcleAccount?> account() async {
     final prefs = await SharedPreferences.getInstance();
@@ -66,6 +71,56 @@ class AppStore {
         jsonEncode(_KeptSeat(playerId, seat).toJson()),
       );
     }
+  }
+
+  /// The app's settings (sound, haptics), or the defaults.
+  Future<AppSettings> settings() async {
+    final prefs = await SharedPreferences.getInstance();
+    return _decode(prefs.getString(_settingsKey), AppSettings.fromJson) ??
+        const AppSettings();
+  }
+
+  Future<void> saveSettings(AppSettings settings) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_settingsKey, jsonEncode(settings.toJson()));
+  }
+
+  /// The name [playerId] chose to be seen by, or null. Kept by player, so it
+  /// outlives signing out and in again, and is nobody else's.
+  Future<String?> displayName(String playerId) async =>
+      (await _byPlayer(_namesKey))[playerId] as String?;
+
+  Future<void> saveDisplayName(String playerId, String? name) =>
+      _saveByPlayer(_namesKey, playerId, name);
+
+  /// What [playerId] last heard of their Party Poppers, or null.
+  Future<PopperBalance?> poppers(String playerId) async {
+    final kept = (await _byPlayer(_poppersKey))[playerId];
+    if (kept is! Map<String, dynamic>) return null;
+    try {
+      return PopperBalance.fromJson(kept);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<void> savePoppers(String playerId, PopperBalance balance) =>
+      _saveByPlayer(_poppersKey, playerId, balance.toJson());
+
+  Future<Map<String, dynamic>> _byPlayer(String key) async {
+    final prefs = await SharedPreferences.getInstance();
+    return _decode(prefs.getString(key), (json) => json) ?? {};
+  }
+
+  Future<void> _saveByPlayer(String key, String playerId, Object? value) async {
+    final prefs = await SharedPreferences.getInstance();
+    final all = {...await _byPlayer(key)};
+    if (value == null) {
+      all.remove(playerId);
+    } else {
+      all[playerId] = value;
+    }
+    await prefs.setString(key, jsonEncode(all));
   }
 
   static T? _decode<T>(String? raw, T Function(Map<String, dynamic>) fromJson) {

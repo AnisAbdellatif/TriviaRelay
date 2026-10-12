@@ -104,6 +104,18 @@ defmodule TriviaRelayWeb.MetersTest do
       assert %{"code" => "rate_limited"} = json_response(join(conn, player(), {10, 7, 0, 1}), 429)
     end
 
+    test "a game that exists but wants a Party Popper is no guess", %{conn: conn} do
+      Req.Test.stub(
+        TriviaRelay.Sporcle,
+        &Req.Test.json(&1, %{"denied" => %{"code" => "BuyPopper"}, "popper_count" => 0})
+      )
+
+      for n <- 1..12 do
+        assert %{"code" => "insufficient_poppers"} =
+                 json_response(join(conn, player(), {10, 9, 0, n}), 409)
+      end
+    end
+
     test "refused joins are metered per address, across accounts", %{conn: conn} do
       Req.Test.stub(TriviaRelay.Sporcle, &Req.Test.json(&1, %{"error" => "Game not found"}))
 
@@ -145,6 +157,51 @@ defmodule TriviaRelayWeb.MetersTest do
         })
 
       assert %{"code" => "rate_limited"} = json_response(conn, 429)
+    end
+  end
+
+  describe "what reaches other people" do
+    defp as_player(conn, id, ip) do
+      conn
+      |> from(ip)
+      |> put_req_header("x-player-id", id)
+      |> put_req_header("x-player-token", "t0k3n")
+      |> put_req_header("x-device-id", "0123456789abcdef")
+    end
+
+    defp report(conn, id, ip) do
+      conn
+      |> as_player(id, ip)
+      |> post(~p"/api/packs/1/report", %{"reason" => "spam", "details" => "ads"})
+    end
+
+    test "reports are metered per Sporcle account, across addresses", %{conn: conn} do
+      Req.Test.stub(TriviaRelay.Sporcle, &Req.Test.json(&1, %{}))
+
+      for n <- 1..10, do: assert(response(report(conn, "p1", {10, 11, 0, n}), 204))
+
+      Req.Test.stub(TriviaRelay.Sporcle, fn _ -> flunk("Sporcle was called") end)
+      assert %{"code" => "rate_limited"} = json_response(report(conn, "p1", {10, 12, 0, 1}), 429)
+    end
+
+    test "reports are metered per address too", %{conn: conn} do
+      Req.Test.stub(TriviaRelay.Sporcle, &Req.Test.json(&1, %{}))
+
+      for n <- 1..5, do: assert(response(report(conn, "a#{n}", {10, 13, 0, 1}), 204))
+      assert %{"code" => "rate_limited"} = json_response(report(conn, "b", {10, 13, 0, 1}), 429)
+    end
+
+    test "inviting everybody is metered per account, and apart from one by one" do
+      {:ok, cred} = Cred.new(player())
+      for _ <- 1..3, do: Meters.account_result(:invite_all, cred, {:ok, %{}})
+
+      assert Meters.account_allowed(:invite_all, cred) == {:error, :rate_limited}
+      assert Meters.account_allowed(:invite, cred) == :ok
+
+      # A made-up token spends nothing.
+      {:ok, other} = Cred.new(player("p2"))
+      for _ <- 1..5, do: Meters.account_result(:invite_all, other, {:error, {:http, 403, %{}}})
+      assert Meters.account_allowed(:invite_all, other) == :ok
     end
   end
 

@@ -27,6 +27,18 @@ abstract class SeatConnection {
   Future<void> finalVote(String choice);
   Future<void> finalWager(int amount);
 
+  /// A thumb on the question on screen: 1 up, -1 down, 0 neither (since 1.2).
+  Future<void> rate(int rating);
+
+  /// Reports the question on screen, for one of [GameRules.reportReasons]
+  /// (since 1.2).
+  Future<void> report(String reason);
+
+  /// A vote for a lobby pack somebody already voted for, or taking one's own
+  /// back (since 1.2). A pack nobody voted for yet is voted for over HTTP,
+  /// like the host's change of pack.
+  Future<void> packVote(int packId, {required bool vote});
+
   // The host's (§4.2).
   Future<void> start();
   Future<void> options(HostOptions options);
@@ -34,7 +46,36 @@ abstract class SeatConnection {
   Future<void> judge(int peerId, bool correct);
   Future<void> judgeSubmit();
   Future<void> next();
+
+  /// Takes [peerId] out of the game: for good ([ban], "Kick"), or free to
+  /// join again (since 1.2).
+  Future<void> remove(int peerId, {required bool ban});
+
+  /// Hands the host to [peerId] (since 1.2).
+  Future<void> makeHost(int peerId);
+
+  /// Everyone back to the lobby, from anywhere in a game (since 1.2).
+  Future<void> toLobby();
+
   Future<void> playAgain();
+
+  /// This app shows the game's chat ([chatClose]: no longer). The relay has
+  /// the chat open with the game while any app shows it (since 1.2).
+  Future<void> chatOpen();
+  Future<void> chatClose();
+
+  /// A message to everyone in the game (since 1.2).
+  Future<void> chatSend(String text);
+
+  /// The player started or stopped typing in the chat (since 1.2).
+  Future<void> chatTyping(bool typing);
+
+  /// Earlier chat messages (since 1.2).
+  Future<void> chatMore();
+
+  /// A reaction sound to [peerId]: one of [GameRules.reactionTypes], the
+  /// goose (the honk) by default (since 1.2).
+  Future<void> react(int peerId, {String type = 'goose'});
 
   /// Leaves the game: the seat closes, and the relay leaves Sporcle.
   Future<void> leave();

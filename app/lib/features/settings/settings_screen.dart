@@ -10,6 +10,7 @@ import '../../shared/navigation.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/update_banner.dart';
+import 'setting_widgets.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -99,6 +100,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             const FzEyebrow('Sporcle account'),
             const SizedBox(height: 8),
             Text(account?.handle ?? '—', style: fz.h(22)),
+            const SizedBox(height: 26),
+            const DisplayNameField(),
+            const SizedBox(height: 26),
+            const FzEyebrow('In a game'),
+            const SizedBox(height: 4),
+            const GameFeedbackSwitches(),
             const SizedBox(height: 26),
             const FzEyebrow('This app'),
             const SizedBox(height: 8),

@@ -66,6 +66,17 @@ Docker reads it **literally**: no quotes around values, no `$VAR`, no `export`. 
 `SECRET_KEY_BASE` locally with `mix phx.gen.secret` (in `server/`); `SPORCLE_API_KEY` is
 explained in [`server/.env.example`](../server/.env.example).
 
+**Invite links on Android.** `https://<PHX_HOST>/join/<code>` opens the web app anywhere.
+For the released Android app to open it instead, Android must find the release key's
+fingerprint at `https://<PHX_HOST>/.well-known/assetlinks.json`: set
+`ANDROID_CERT_SHA256` in the `.env` to it (`apksigner verify --print-certs
+trivia-relay-<version>.apk` prints it as `SHA-256 digest`; colons optional,
+comma-separate several). The APK must have been built for the same host (`scripts/ci.sh apk`
+takes it from `SERVER_URL`). Android checks when the app is installed or updated, so set
+it before publishing a release that has the links; a phone that checked too early opens
+links in the browser until the app is next updated. Without it the endpoint is a 404 and
+links simply open the web app.
+
 ### 3. Caddy
 
 [trivia-relay.caddy](trivia-relay.caddy) is the whole site, with the domain as an argument:

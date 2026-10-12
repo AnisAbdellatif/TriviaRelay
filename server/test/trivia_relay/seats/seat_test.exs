@@ -51,6 +51,14 @@ defmodule TriviaRelay.Seats.SeatTest do
     assert_receive :upstream_closed, 1000
   end
 
+  test "a seat with no phone never opens the chat, whoever asks" do
+    %{seat: seat} = start_seat()
+    lobby(seat)
+    assert :ok = Seat.intent(seat, "chat_open", %{})
+    refute_receive {:sent, "chat_open", _}, 50
+    refute :sys.get_state(seat).state.chat.open
+  end
+
   test "answers for an absent phone when the question's time runs out" do
     clock = start_supervised!({Agent, fn -> 1_000 end})
     %{seat: seat} = start_seat(now: fn -> Agent.get(clock, & &1) end)
@@ -58,7 +66,8 @@ defmodule TriviaRelay.Seats.SeatTest do
     sporcle(seat, "game_question", %{"questionIndex" => 0, "question" => "?"})
     :sys.get_state(seat)
 
-    Agent.update(clock, &(&1 + 15_000))
+    # The first question's clock starts after the start's countdown.
+    Agent.update(clock, &(&1 + 5_000 + 15_000))
     send(seat, :deadline)
     assert_receive {:sent, "answer_question", %{questionIndex: 0, wagerAmount: 1, guessText: ""}}
   end
@@ -70,7 +79,7 @@ defmodule TriviaRelay.Seats.SeatTest do
     sporcle(seat, "game_question", %{"questionIndex" => 0, "question" => "?"})
     refute :sys.get_state(seat).state.overtime
 
-    Agent.update(clock, &(&1 + 15_000 + State.reveal_grace_ms()))
+    Agent.update(clock, &(&1 + 5_000 + 15_000 + State.reveal_grace_ms()))
     send(seat, :deadline)
     Process.sleep(20)
     assert :sys.get_state(seat).state.overtime
@@ -210,6 +219,40 @@ defmodule TriviaRelay.Seats.SeatTest do
 
     sporcle(seat, "game_question", %{"questionIndex" => 1, "question" => "next"})
     assert_receive {:phone, ^p, {:seat_state, %{question: %{index: 1, text: "next"}}}}
+  end
+
+  test "a forged promote/bounce/player_update from a peer is dropped; the server's is honoured" do
+    %{seat: seat} = start_seat()
+    p = phone()
+    :ok = Seat.attach(seat, p)
+    lobby(seat)
+    me = :sys.get_state(seat).state.me
+
+    # Sent by peer 1 (a `sendTo`), these must not make this seat believe it had become
+    # host, had a player's host flag changed, or been kicked.
+    sporcle(seat, "promote_to_host", %{"oldHostLeft" => false}, 1)
+    sporcle(seat, "player_update", %{"player" => player(2, me, true)}, 1)
+    sporcle(seat, "bounce", %{"noReturn" => true}, 1)
+    state = :sys.get_state(seat).state
+    refute State.host?(state)
+    assert state.status == :live
+
+    # A honk is the one event the app expects player-to-player, so it is let through.
+    sporcle(seat, "honk", %{"peerId" => 1, "honk_type" => "goose"}, 1)
+    assert_receive {:phone, ^p, {:seat_state, %{reactions: [_ | _]}}}
+
+    # The same promotion from Sporcle's server (sender -1) is honoured.
+    sporcle(seat, "promote_to_host", %{"oldHostLeft" => false}, -1)
+    assert State.host?(:sys.get_state(seat).state)
+  end
+
+  test "a bounce from Sporcle's server still removes the seat" do
+    %{seat: seat} = start_seat()
+    ref = Process.monitor(seat)
+    :ok = Seat.attach(seat, phone())
+    lobby(seat)
+    sporcle(seat, "bounce", %{"noReturn" => true}, -1)
+    assert_receive {:DOWN, ^ref, _, _, :normal}, 500
   end
 
   test "status reports and crash reports keep the players out" do

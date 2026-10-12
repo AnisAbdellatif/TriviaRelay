@@ -49,8 +49,12 @@ defmodule TriviaRelayWeb.ChannelCase do
     %{id: id, token: TriviaRelay.Seats.sign(id), seat: seat, upstream: upstream, me: me}
   end
 
-  @doc "Plays Sporcle's side: the seat's upstream received `event`."
-  def sporcle(seat, event, payload), do: send(seat, {:upstream, "test", {:event, event, payload}})
+  @doc "Plays Sporcle's side: the seat's upstream received `event` from the server (sender -1)."
+  def sporcle(seat, event, payload), do: sporcle(seat, event, payload, -1)
+
+  @doc "As `sporcle/3`, but from `sender` (a peer id for a forged `sendTo`, `-1` for the server)."
+  def sporcle(seat, event, payload, sender),
+    do: send(seat, {:upstream, "test", {:event, event, payload, sender}})
 
   @doc "A lobby with the host (peer 1) and this seat's player (peer 2), five questions of 15 s."
   def lobby(seat) do

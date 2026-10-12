@@ -4,6 +4,23 @@ defmodule TriviaRelayWeb.SporcleErrors do
   alias TriviaRelayWeb.ApiError
   alias TriviaRelayWeb.Plugs.RateLimit
 
+  @doc """
+  As `send/2`, for a call that asks Sporcle to do something for the player (bookmark,
+  report, invite, …) rather than to seat them: Sporcle answering it with a refusal of
+  its own (a 4xx other than a sign-in's) is `409 sporcle_refused`, not an outage.
+  """
+  def send_action(conn, {:error, {:http, status, _}})
+      when status in 400..499 and status not in [401, 403],
+      do:
+        ApiError.send(
+          conn,
+          :conflict,
+          "sporcle_refused",
+          "Sporcle turned that down. Try again later."
+        )
+
+  def send_action(conn, error), do: __MODULE__.send(conn, error)
+
   def send(conn, {:error, :invalid_player}),
     do: ApiError.send(conn, :bad_request, "invalid_player", "Sign in to Sporcle first.")
 
@@ -19,9 +36,11 @@ defmodule TriviaRelayWeb.SporcleErrors do
   def send(conn, {:error, :seat_not_found}),
     do: ApiError.send(conn, :not_found, "seat_not_found", "This seat has ended.")
 
-  # The seat refused, as it refuses an intent: not_host, wrong_phase, not_live.
-  def send(conn, {:error, code}) when code in ["not_host", "wrong_phase", "not_live"],
-    do: ApiError.send(conn, :conflict, code, TriviaRelayWeb.SeatChannel.message(code))
+  # The seat refused, as it refuses an intent: not_host, wrong_phase, not_live, and for a
+  # pack vote too_many_votes or draft_pack.
+  def send(conn, {:error, code})
+      when code in ["not_host", "wrong_phase", "not_live", "too_many_votes", "draft_pack"],
+      do: ApiError.send(conn, :conflict, code, TriviaRelayWeb.SeatChannel.message(code))
 
   def send(conn, {:error, {:http, status, _}}) when status in [401, 403],
     do:
@@ -30,6 +49,17 @@ defmodule TriviaRelayWeb.SporcleErrors do
         :unauthorized,
         "sporcle_auth",
         "Your Sporcle sign-in has expired. Sign in again."
+      )
+
+  # A game with images costs a player who isn't its host one Party Popper, and Sporcle
+  # refuses a player with none (`denied.code` "BuyPopper", decompiled only).
+  def send(conn, {:error, {:refused, %{"denied" => %{"code" => "BuyPopper"}}}}),
+    do:
+      ApiError.send(
+        conn,
+        :conflict,
+        "insufficient_poppers",
+        "This game has pictures, and joining it takes a Party Popper. You have none left."
       )
 
   def send(conn, {:error, {:refused, body}}),
@@ -87,8 +117,13 @@ defmodule TriviaRelayWeb.SporcleErrors do
 
   # What Sporcle said when it answered 200 without a player session: a game that doesn't
   # exist, a full game, a guest account. Passed on as it came, since only it knows.
+  # joinGame says why in `denied: {code, message}` (decompiled only; `GameNotFound`,
+  # `GameFull`, `Blocked`, …); other answers have said it at the top.
+  defp refusal(%{"denied" => %{"message" => message}}) when is_binary(message) and message != "",
+    do: message
+
   defp refusal(%{} = body) do
-    body["message"] || body["error"] || body["reason"] ||
+    Enum.find([body["message"], body["error"], body["reason"]], &is_binary/1) ||
       "Sporcle wouldn't seat you in that game."
   end
 

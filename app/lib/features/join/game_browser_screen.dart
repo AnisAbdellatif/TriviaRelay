@@ -6,10 +6,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/account_providers.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../core/providers/settings_providers.dart';
 import '../../shared/navigation.dart';
+import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
+import '../../shared/widgets/fz_toast.dart';
 import '../host/pack_tile.dart';
 
 /// The games the player could join, as the official app's join screen lists
@@ -64,17 +67,25 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
     }
   }
 
-  /// Joining a game that has started seats the player mid-game, so it is
-  /// asked first; a lobby is joined at once.
+  /// Joining a game that has started seats the player mid-game, and joining
+  /// one with pictures costs a Party Popper, so either is asked first; a lobby
+  /// without pictures is joined at once.
   Future<void> _pick(JoinableGame game) async {
-    if (!game.inLobby) {
+    if (!game.inLobby || game.hasImages) {
+      final poppers = ref.read(poppersProvider).value?.poppers;
       final join = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
-          title: const Text('Join a game in progress?'),
+          title: Text(
+            game.inLobby ? 'Spend a Party Popper?' : 'Join a game in progress?',
+          ),
           content: Text(
-            'It has already started (${gameStage(game)}). You join it where '
-            'it is now.',
+            [
+              if (!game.inLobby)
+                'It has already started (${gameStage(game)}). You join it '
+                    'where it is now.',
+              if (game.hasImages) popperCost(poppers),
+            ].join('\n\n'),
           ),
           actions: [
             TextButton(
@@ -211,6 +222,12 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.fromLTRB(22, 6, 22, 22),
                           children: [
+                            // Only where it matters: a game here has pictures.
+                            if (all?.any((game) => game.hasImages) ?? false)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 6),
+                                child: PoppersPanel(),
+                              ),
                             if (games != null)
                               for (final list in GameList.values)
                                 ..._section(fz, list, games),
@@ -428,10 +445,95 @@ String gameStage(JoinableGame game) => switch (game.stage) {
   GameStage.playing => 'Playing',
 };
 
-/// " · 4 players · photos".
+/// " · 4 players · photos · 1 popper".
 String gameFacts(JoinableGame game) => [
   '',
   if (game.playerCount != null)
     game.playerCount == 1 ? '1 player' : '${game.playerCount} players',
-  if (game.hasImages) 'photos',
+  if (game.hasImages) 'photos · 1 popper',
 ].join(' · ');
+
+/// What joining a game with pictures costs, and what the player has when the
+/// app knows.
+String popperCost(int? poppers) {
+  final have = switch (poppers) {
+    null => '',
+    0 => ' You have none left.',
+    1 => ' You have 1.',
+    _ => ' You have $poppers.',
+  };
+  return 'This game has pictures: joining it takes 1 Party Popper.$have '
+      'The host plays free.';
+}
+
+/// The player's Party Poppers, and claiming the free ones Sporcle gives back
+/// (protocol/PROTOCOL.md §3.5). Buying more is for Sporcle Party's own app.
+class PoppersPanel extends ConsumerStatefulWidget {
+  const PoppersPanel({super.key});
+
+  @override
+  ConsumerState<PoppersPanel> createState() => _PoppersPanelState();
+}
+
+class _PoppersPanelState extends ConsumerState<PoppersPanel> {
+  bool _claiming = false;
+
+  Future<void> _claim() async {
+    if (_claiming) return;
+    final before = ref.read(poppersProvider).value?.poppers;
+    setState(() => _claiming = true);
+    try {
+      final balance = await ref.read(poppersProvider.notifier).claim();
+      if (!mounted) return;
+      final now = balance.poppers;
+      showFzToast(
+        context,
+        now == null
+            ? 'Claimed.'
+            : now == before
+            ? 'None to claim yet: one comes back every 4 hours, up to 5.'
+            : 'You have ${now == 1 ? '1 Party Popper' : '$now Party Poppers'}.',
+      );
+    } on Object catch (error) {
+      if (mounted) showError(context, ref, error);
+    } finally {
+      if (mounted) setState(() => _claiming = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final fz = FzTheme.of(context);
+    final poppers = ref.watch(poppersProvider).value?.poppers;
+    return FzPanel(
+      key: const Key('poppersPanel'),
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const FzEyebrow('Party Poppers'),
+          const SizedBox(height: 6),
+          Text(
+            poppers == null
+                ? 'A game with pictures costs 1 to join, except for its host.'
+                : 'You have $poppers. A game with pictures costs 1 to join, '
+                      'except for its host.',
+            key: const Key('popperBalance'),
+            style: fz.m(13, color: FzColors.dim, height: 1.45),
+          ),
+          const SizedBox(height: 10),
+          FzButton(
+            key: const Key('claimPoppersButton'),
+            label: 'Claim free ones',
+            trailing: 'one every 4 h',
+            kind: FzButtonKind.outline,
+            height: 48,
+            fontSize: 15,
+            busy: _claiming,
+            onPressed: _claim,
+          ),
+        ],
+      ),
+    );
+  }
+}

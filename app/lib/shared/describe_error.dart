@@ -13,6 +13,10 @@ String describeError(Object error) {
     'sporcle_unavailable' => "Sporcle didn't answer. Try again in a moment.",
     'game_refused' =>
       error.message ?? "Sporcle wouldn't seat you in that game.",
+    'insufficient_poppers' =>
+      'This game has pictures, and joining it takes a Party Popper. You '
+          'have none left: a free one comes back every 4 hours.',
+    'sporcle_refused' => 'Sporcle turned that down. Try again later.',
     'invalid_code' => 'A game code is 4 to 8 digits.',
     'invalid_player' => 'Sign in to Sporcle first.',
     'pack_not_found' => "That pack doesn't exist any more.",

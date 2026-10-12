@@ -37,7 +37,27 @@ LoginRunner loginRunner(Ref ref) {
 @Riverpod(keepAlive: true)
 class Account extends _$Account {
   @override
-  Future<SporcleAccount?> build() => ref.watch(appStoreProvider).account();
+  Future<SporcleAccount?> build() async {
+    final store = ref.watch(appStoreProvider);
+    final account = await store.account();
+    if (account == null) return null;
+    return account.copyWith(
+      displayName: await store.displayName(account.playerId),
+    );
+  }
+
+  /// The name other players see from now on, or the handle again (null): what
+  /// the next seat is taken with. Kept for this player on this device.
+  Future<void> setDisplayName(String? name) async {
+    final account = await future;
+    if (account == null) return;
+    final chosen = name == null || name.trim().isEmpty ? null : name.trim();
+    final store = ref.read(appStoreProvider);
+    await store.saveDisplayName(account.playerId, chosen);
+    final next = account.copyWith(displayName: chosen);
+    await store.saveAccount(next);
+    state = AsyncData(next);
+  }
 
   /// Logs in and keeps the Party credentials the login returns. The password is
   /// used for the login and forgotten.
@@ -56,6 +76,7 @@ class Account extends _$Account {
       token: credentials.token,
       handle: credentials.handle,
       deviceId: deviceId,
+      displayName: await store.displayName(credentials.playerId),
     );
     // A seat somebody else left on this phone is theirs: dropped, not offered.
     if (await store.seat(account.playerId) == null) await store.saveSeat(null);

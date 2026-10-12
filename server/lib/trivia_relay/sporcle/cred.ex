@@ -1,27 +1,32 @@
 defmodule TriviaRelay.Sporcle.Cred do
   @moduledoc """
   One Sporcle account's Party credentials: the bare player id, the session token,
-  a device id and the handle other players see.
+  a device id and the account's handle, and the name other players see in a game
+  (`name`, the handle when the player hasn't chosen one).
 
   In the relay these arrive from the phone with each request (`new/1`) and are never
   kept. Each is checked for shape before it goes anywhere: they become headers on a
-  Sporcle call and keys in the relay's meters, and the handle is shown to other players.
+  Sporcle call and keys in the relay's meters, and the names are shown to other players.
   The spike console reads its own from files (`TriviaRelay.Spike.Creds`, dev only).
   """
 
   @enforce_keys [:player_id, :token, :device_id, :handle]
-  defstruct @enforce_keys
+  defstruct @enforce_keys ++ [name: nil]
 
   @type t :: %__MODULE__{
           player_id: String.t(),
           token: String.t(),
           device_id: String.t(),
-          handle: String.t()
+          handle: String.t(),
+          name: String.t() | nil
         }
 
   @max_handle 40
 
-  @doc "From a phone's request: `player_id`, `token`, `device_id` and `handle`."
+  @doc """
+  From a phone's request: `player_id`, `token`, `device_id`, `handle` and, optionally,
+  `name`.
+  """
   def new(%{} = p) do
     with id when is_binary(id) <- p["player_id"],
          true <- player_id?(id),
@@ -34,7 +39,8 @@ defmodule TriviaRelay.Sporcle.Cred do
          player_id: id,
          token: token,
          device_id: device,
-         handle: handle(p["handle"])
+         handle: handle(p["handle"]),
+         name: name(p["name"])
        }}
     else
       _ -> {:error, :invalid_player}
@@ -68,23 +74,24 @@ defmodule TriviaRelay.Sporcle.Cred do
   characters — and so are marks stacked past a few. At most #{@max_handle} characters;
   "Player" when nothing is left.
   """
-  def handle(name) when is_binary(name) do
-    if String.valid?(name) do
-      name
-      |> String.replace(~r/[\x{09}-\x{0D}\x{85}\x{2028}\x{2029}]/u, " ")
-      |> String.replace(~r/[^\p{L}\p{M}\p{N}\p{P}\p{S}\p{Zs}]/u, "")
-      |> String.replace(~r/(\p{M}{3})\p{M}+/u, "\\1")
-      |> String.replace(~r/\p{Zs}+/u, " ")
-      |> String.trim()
-      |> String.slice(0, @max_handle)
-      |> String.trim()
-      |> default_handle()
-    else
-      "Player"
+  def handle(name), do: name |> clean() |> default_handle()
+
+  @doc """
+  The name the player chose to be seen by, cleaned as `handle/1` cleans a handle, or nil
+  when they chose none (or nothing of it is left): then the handle is shown.
+  """
+  def name(name) do
+    case clean(name) do
+      "" -> nil
+      name -> name
     end
   end
 
-  def handle(_), do: "Player"
+  @doc "The name other players see: the one chosen, else the handle."
+  def display_name(%__MODULE__{name: name}) when is_binary(name), do: name
+  def display_name(%__MODULE__{handle: handle}), do: handle
+
+  defp clean(name), do: TriviaRelay.Text.clean(name, @max_handle)
 
   defp default_handle(""), do: "Player"
   defp default_handle(name), do: name

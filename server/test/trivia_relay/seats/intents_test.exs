@@ -143,7 +143,7 @@ defmodule TriviaRelay.Seats.IntentsTest do
   end
 
   describe "changing the pack" do
-    test "is the host's, in the lobby, and shows at once" do
+    test "is the host's, in the lobby, and shows at once; anybody else's is a vote" do
       pack = %{"id" => 268_682, "name" => "Capitals"}
 
       assert {:ok, [{"change_pack", %{gamePack: ^pack}}], s} =
@@ -151,7 +151,9 @@ defmodule TriviaRelay.Seats.IntentsTest do
 
       assert s.pack.id == 268_682
 
-      assert {:error, "not_host"} = Intents.change_pack(Replay.fresh(:lobby, :join), pack)
+      assert {:ok, [{"vote_on_pack", %{gamePack: ^pack}}], _} =
+               Intents.change_pack(Replay.fresh(:lobby, :join), pack)
+
       assert {:error, "wrong_phase"} = Intents.change_pack(Replay.fresh(:question), pack)
     end
   end
