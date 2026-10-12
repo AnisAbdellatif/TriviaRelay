@@ -43,6 +43,7 @@ String describeError(Object error) {
       'Not everyone has answered yet. Reveal opens 5 seconds after time '
           'runs out.',
     'invalid_intent' => "That can't be done right now.",
+    'bypass_revoked' => 'Your bypass access was revoked.',
     GameError.notJoined => 'Not connected to the game right now.',
     GameError.connectionFailed => 'Could not reach the relay.',
     GameError.timeout => 'The relay did not answer.',

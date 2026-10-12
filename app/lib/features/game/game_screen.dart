@@ -7,12 +7,14 @@ import '../../core/connection/seat_connection.dart';
 import '../../core/game/social.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../core/providers/settings_providers.dart';
 import '../../shared/navigation.dart';
 import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/connection_banner.dart';
 import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/game_top_bar.dart';
+import 'bypass_menu.dart';
 import 'chat_screen.dart';
 import 'closed_view.dart';
 import 'final_views.dart';
@@ -251,6 +253,9 @@ class _GameScreenState extends ConsumerState<GameScreen> {
         if (didPop && closed == null) ref.invalidate(seatConnectionProvider);
       },
       child: Scaffold(
+        floatingActionButton: state != null && !ended
+            ? BypassFab(state: state)
+            : null,
         body: FzBackground(
           arcs: ended ? null : _arcs(state),
           child: SafeArea(
@@ -470,6 +475,12 @@ Future<void> act(
           .run(pending, () => intent(connection), value: value);
     }
   } on Object catch (error) {
+    if (error is GameError && error.code == 'bypass_revoked') {
+      final token = ref.read(kickBypassTokenProvider).value;
+      if (token != null) {
+        unawaited(ref.read(kickBypassTokenProvider.notifier).revoked(token));
+      }
+    }
     if (context.mounted) showError(context, ref, error);
   }
 }

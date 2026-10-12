@@ -50,4 +50,11 @@ defmodule TriviaRelayWeb.WebAppTest do
       assert get_resp_header(conn, "x-frame-options") == ["DENY"]
     end
   end
+
+  # The page's `form-action 'none'` would stop the admin panel's forms.
+  test "what the app doesn't serve gets none of its headers", %{conn: conn} do
+    conn = get(conn, "/admin/login")
+    refute policy(conn)["form-action"]
+    assert get_resp_header(conn, "x-frame-options") == []
+  end
 end

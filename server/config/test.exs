@@ -30,3 +30,8 @@ config :trivia_relay,
   upstream: TriviaRelay.FakeUpstream
 
 config :ex_unit, assert_receive_timeout: 1000
+
+# Bypass codes in a file of the tests' own, away from a dev relay's.
+config :trivia_relay,
+  bypass_dets_path:
+    String.to_charlist(Path.join(System.tmp_dir!(), "trivia_relay_bypass_test.dets"))

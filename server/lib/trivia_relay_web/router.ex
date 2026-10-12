@@ -7,6 +7,13 @@ defmodule TriviaRelayWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :admin do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   # Each of these makes calls to Sporcle for the caller, so each is metered per address
   # (an IPv6 caller per /64, and per /48 with four times the room). What a call led to is
   # metered in the controllers too (TriviaRelayWeb.Meters): failed logins per email and
@@ -145,5 +152,19 @@ defmodule TriviaRelayWeb.Router do
       pipe_through :pack_change_limit
       post "/seats/pack", SeatController, :change_pack
     end
+
+    # Host: redeem a one-time bypass code for a per-device bearer token.
+    post "/bypass/redeem", BypassController, :redeem
+    get "/bypass/check", BypassController, :check
+  end
+
+  scope "/admin", TriviaRelayWeb do
+    pipe_through :admin
+    get "/", AdminController, :index
+    get "/login", AdminController, :login_form
+    post "/login", AdminController, :login
+    post "/logout", AdminController, :logout
+    post "/codes", AdminController, :create_code
+    post "/codes/delete", AdminController, :delete_code
   end
 end

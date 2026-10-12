@@ -39,12 +39,20 @@ defmodule TriviaRelayWeb.Endpoint do
   plug Plug.Telemetry, event_prefix: [:phoenix, :endpoint]
 
   plug Plug.Parsers,
-    parsers: [:json],
+    parsers: [:urlencoded, :json],
     pass: ["application/json"],
     length: 16_384,
     json_decoder: Phoenix.json_library()
 
   plug Plug.Head
+
+  plug Plug.Session,
+    store: :cookie,
+    key: "_trivia_relay_admin",
+    signing_salt: "admin session",
+    http_only: true,
+    same_site: "Strict"
+
   # The web app at "/" (WEB_DIR), before the router, which only knows /api and /health.
   plug TriviaRelayWeb.Plugs.WebApp
   plug TriviaRelayWeb.Router

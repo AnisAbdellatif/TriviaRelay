@@ -54,19 +54,23 @@ defmodule TriviaRelayWeb.Plugs.WebApp do
     if invite_code?(code), do: conn |> protect() |> send_index(dir), else: conn
   end
 
+  # The page's headers go only on what this serves: the API and /admin set their own.
   defp serve(conn, dir) do
-    Plug.Static.call(
-      protect(conn),
-      Plug.Static.init(
-        at: "/",
-        from: dir,
-        only: @served,
-        only_matching: @served_prefixes,
-        brotli: true,
-        cache_control_for_etags: @cache_control,
-        cache_control_for_vsn_requests: @cache_control
+    served =
+      Plug.Static.call(
+        protect(conn),
+        Plug.Static.init(
+          at: "/",
+          from: dir,
+          only: @served,
+          only_matching: @served_prefixes,
+          brotli: true,
+          cache_control_for_etags: @cache_control,
+          cache_control_for_vsn_requests: @cache_control
+        )
       )
-    )
+
+    if served.halted, do: served, else: conn
   end
 
   # What the page may load, and that no other site may frame it: a host's controls under

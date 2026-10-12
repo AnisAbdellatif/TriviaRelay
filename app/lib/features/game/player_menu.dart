@@ -6,6 +6,7 @@ import '../../core/game/social.dart';
 import '../../core/models/models.dart';
 import '../../core/providers/config_providers.dart';
 import '../../core/providers/connection_providers.dart';
+import '../../core/providers/settings_providers.dart';
 import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
 import '../../shared/widgets/fz_direction.dart';
@@ -23,8 +24,9 @@ enum PlayerAction { honk, makeHost, remove, kick }
 
 /// Whether this seat may open [player]'s menu: anybody, on anybody else who is
 /// there, as the official app offers it (not on a player who is away).
-bool canOpenMenu(SeatState state, PlayerView player) =>
-    player.peerId != state.you.peerId && player.connected;
+/// With [bypass] the connected check is waived (bypass secret is set in Settings).
+bool canOpenMenu(SeatState state, PlayerView player, {bool bypass = false}) =>
+    player.peerId != state.you.peerId && (player.connected || bypass);
 
 /// What tapping [player]'s row does here: their menu, when this seat may open
 /// it and the game can be acted on; nothing otherwise.
@@ -34,7 +36,9 @@ VoidCallback? managePlayer(
   SeatState state,
   PlayerView player,
 ) {
-  if (!canOpenMenu(state, player) || !ref.watch(seatInteractiveProvider)) {
+  final bypass = ref.watch(kickBypassTokenProvider).value != null;
+  if (!canOpenMenu(state, player, bypass: bypass) ||
+      !ref.watch(seatInteractiveProvider)) {
     return null;
   }
   return () => showPlayerMenu(context, ref, player, host: state.you.host);
@@ -63,18 +67,29 @@ bool reactionReady(WidgetRef ref) {
 
 /// [player]'s menu, then (for the host's actions) the confirmation, then the
 /// intent. [host] adds the host's actions.
+///
+/// When the bypass token is active and [player] is away, only Remove and Kick are
+/// offered (Honk and Make Host require the player to be connected). The token
+/// persists — the host may kick multiple away players without re-entering anything.
 Future<void> showPlayerMenu(
   BuildContext context,
   WidgetRef ref,
   PlayerView player, {
   required bool host,
 }) async {
+  final bypassToken = ref.read(kickBypassTokenProvider).value;
+  final awayBypass = bypassToken != null && !player.connected;
+
   final action = await showModalBottomSheet<PlayerAction>(
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
-    builder: (context) =>
-        _PlayerMenu(player: player, host: host, canReact: reactionReady(ref)),
+    builder: (context) => _PlayerMenu(
+      player: player,
+      host: host,
+      canReact: reactionReady(ref),
+      awayBypass: awayBypass,
+    ),
   );
   if (action == null || !context.mounted) return;
   if (action == PlayerAction.honk) return _honk(context, ref, player);
@@ -87,8 +102,16 @@ Future<void> showPlayerMenu(
     (c) => switch (action) {
       PlayerAction.honk => c.react(player.peerId),
       PlayerAction.makeHost => c.makeHost(player.peerId),
-      PlayerAction.remove => c.remove(player.peerId, ban: false),
-      PlayerAction.kick => c.remove(player.peerId, ban: true),
+      PlayerAction.remove => c.remove(
+        player.peerId,
+        ban: false,
+        bypassToken: awayBypass ? bypassToken : null,
+      ),
+      PlayerAction.kick => c.remove(
+        player.peerId,
+        ban: true,
+        bypassToken: awayBypass ? bypassToken : null,
+      ),
     },
     pending: 'player:${player.peerId}',
   );
@@ -170,6 +193,7 @@ class _PlayerMenu extends StatelessWidget {
     required this.player,
     required this.host,
     required this.canReact,
+    this.awayBypass = false,
   });
 
   final PlayerView player;
@@ -177,6 +201,10 @@ class _PlayerMenu extends StatelessWidget {
 
   /// False just after a reaction was sent: the next waits a moment.
   final bool canReact;
+
+  /// True when the host opened this menu for an away player using the bypass
+  /// secret: Honk and Make Host are hidden (they require the player to be there).
+  final bool awayBypass;
 
   @override
   Widget build(BuildContext context) {
@@ -233,21 +261,23 @@ class _PlayerMenu extends StatelessWidget {
                 ],
               ),
             ),
-            item(
-              PlayerAction.honk,
-              Icons.campaign_outlined,
-              'Honk',
-              canReact ? 'A honk plays on their phone' : 'Wait a moment',
-              color: FzColors.ac,
-              enabled: canReact,
-            ),
-            if (host) ...[
+            if (!awayBypass)
               item(
-                PlayerAction.makeHost,
-                Icons.star_outline,
-                'Make host',
-                'Hand them the game',
+                PlayerAction.honk,
+                Icons.campaign_outlined,
+                'Honk',
+                canReact ? 'A honk plays on their phone' : 'Wait a moment',
+                color: FzColors.ac,
+                enabled: canReact,
               ),
+            if (host) ...[
+              if (!awayBypass)
+                item(
+                  PlayerAction.makeHost,
+                  Icons.star_outline,
+                  'Make host',
+                  'Hand them the game',
+                ),
               item(
                 PlayerAction.remove,
                 Icons.logout,

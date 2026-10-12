@@ -224,6 +224,21 @@ the relay vouches for it: `GET /.well-known/assetlinks.json` names the released 
 signing key's fingerprints, from the deployment's `ANDROID_CERT_SHA256`, and is `404`
 without them. (Since 1.2.)
 
+### 3.9 Bypass
+
+The relay's operator hands out one-time codes (made at `/admin`, behind the deployment's
+`ADMIN_PASSWORD`; without it, bypass is off). A code lets one app install take the host and
+remove players who are away (§4.2). (Since 1.3.)
+
+- `POST /api/bypass/redeem` `{code, device_id}` → `200 {bearer}`, once per code:
+  `404 not_found`, `409 already_used`, `503 bypass_disabled`, `400 invalid_request`. The
+  app keeps the bearer, never the code.
+- `GET /api/bypass/check`, the bearer in the `x-bypass-token` header → `204` while it is
+  good, `403 bypass_revoked` once it is not.
+
+A bearer is good for a year, and only while its code is still on the relay: deleting the
+code revokes it. An app that learns its bearer is revoked forgets it.
+
 ## 4. App → relay
 
 ### 4.1 `phx_join` on `seat:<seat_id>`
@@ -285,6 +300,15 @@ Host only (`you.host`); anybody else gets `not_host`:
 `remove` and `make_host` name another player who is in the game and connected; anybody else
 (the host themselves, a player who is away, nobody) is `invalid_intent`.
 
+With a bypass bearer (§3.9; since 1.3), from any seat:
+
+| event | payload | when |
+|---|---|---|
+| `claim_host` | `{bypass_token}` | any phase: this player becomes the host |
+| `remove` | `{peer_id, ban: bool, bypass_token}` | as above, and also a player who is away (host only) |
+
+A bearer that isn't good is `bypass_revoked`, and the app forgets it.
+
 Other error codes:
 - `not_live`: the relay isn't connected to the game yet.
 - `wrong_phase`.
@@ -292,6 +316,7 @@ Other error codes:
 - `not_everyone_answered`: a `reveal` before `you.can_reveal`.
 - `invalid_wager`, `invalid_options`, `invalid_intent`.
 - `spectating`, `too_many_votes`, `draft_pack` (since 1.2).
+- `bypass_revoked` (since 1.3).
 - `rate_limited`: 60 intents per 10 s, per connection and again per seat (all its apps
   together). Since 1.2, what reaches other players is limited again per seat: 5
   `chat_send` per 10 s, 10 `chat_typing` per 10 s, 10 `chat_more` a minute, and 15

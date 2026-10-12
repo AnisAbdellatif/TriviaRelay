@@ -139,7 +139,7 @@
     }
   ],
   "pack_votes": [],
-  "protocol_minor": 2,
+  "protocol_minor": 3,
   "server_time": 1790000000000,
   "you": {
     "host": false,

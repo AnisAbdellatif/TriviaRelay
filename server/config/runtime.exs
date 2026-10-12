@@ -82,6 +82,21 @@ if max_seats = System.get_env("MAX_SEATS") do
   config :trivia_relay, :max_seats, String.to_integer(max_seats)
 end
 
+# Password for the web admin panel at `/admin` (bypass code management).
+# Unset, the bypass feature is disabled: no codes can be created, no bearer tokens issued,
+# and `bypass_token` in a `remove` intent always fails. Keep it out of logs and commits.
+if password = System.get_env("ADMIN_PASSWORD") do
+  config :trivia_relay, :admin_password, password
+
+  # Where the DETS file that stores one-time codes lives. Defaults to the system temp dir.
+  # Point this at a volume mount to survive container replacements.
+  path =
+    System.get_env("BYPASS_DETS_PATH") ||
+      Path.join(System.tmp_dir!(), "trivia_relay_bypass.dets")
+
+  config :trivia_relay, :bypass_dets_path, String.to_charlist(path)
+end
+
 # The built web app (`flutter build web` in app/), served at "/".
 if web_dir = System.get_env("WEB_DIR") do
   config :trivia_relay, :web_dir, web_dir

@@ -112,6 +112,64 @@ abstract class _$Poppers extends $AsyncNotifier<PopperBalance?> {
   }
 }
 
+/// A HMAC-signed bearer token returned by the relay after redeeming a one-time bypass
+/// code (Settings → "Host tools"). While set, the host's player menu opens for away
+/// players too. Persists across app restarts in [AppStore]; null means bypass is off.
+
+@ProviderFor(KickBypassToken)
+final kickBypassTokenProvider = KickBypassTokenProvider._();
+
+/// A HMAC-signed bearer token returned by the relay after redeeming a one-time bypass
+/// code (Settings → "Host tools"). While set, the host's player menu opens for away
+/// players too. Persists across app restarts in [AppStore]; null means bypass is off.
+final class KickBypassTokenProvider
+    extends $AsyncNotifierProvider<KickBypassToken, String?> {
+  /// A HMAC-signed bearer token returned by the relay after redeeming a one-time bypass
+  /// code (Settings → "Host tools"). While set, the host's player menu opens for away
+  /// players too. Persists across app restarts in [AppStore]; null means bypass is off.
+  KickBypassTokenProvider._()
+    : super(
+        from: null,
+        argument: null,
+        retry: null,
+        name: r'kickBypassTokenProvider',
+        isAutoDispose: false,
+        dependencies: null,
+        $allTransitiveDependencies: null,
+      );
+
+  @override
+  String debugGetCreateSourceHash() => _$kickBypassTokenHash();
+
+  @$internal
+  @override
+  KickBypassToken create() => KickBypassToken();
+}
+
+String _$kickBypassTokenHash() => r'd0870eed6cdf4dc361e045fde03b9a2a31a1d958';
+
+/// A HMAC-signed bearer token returned by the relay after redeeming a one-time bypass
+/// code (Settings → "Host tools"). While set, the host's player menu opens for away
+/// players too. Persists across app restarts in [AppStore]; null means bypass is off.
+
+abstract class _$KickBypassToken extends $AsyncNotifier<String?> {
+  FutureOr<String?> build();
+  @$mustCallSuper
+  @override
+  WhenComplete runBuild() {
+    final ref = this.ref as $Ref<AsyncValue<String?>, String?>;
+    final element =
+        ref.element
+            as $ClassProviderElement<
+              AnyNotifier<AsyncValue<String?>, String?>,
+              AsyncValue<String?>,
+              Object?,
+              Object?
+            >;
+    return element.handleCreate(ref, build);
+  }
+}
+
 /// A game an invite link asked to join (protocol/PROTOCOL.md §3.8), waiting for
 /// the person to say yes or no. Home offers it once somebody is signed in.
 

@@ -11,6 +11,7 @@ defmodule TriviaRelay.Application do
       TriviaRelayWeb.Telemetry,
       {Phoenix.PubSub, name: TriviaRelay.PubSub},
       TriviaRelay.RateLimit,
+      TriviaRelay.Bypass,
       {Registry, keys: :unique, name: TriviaRelay.Seats.Registry},
       # One seat per Sporcle player (`TriviaRelay.Seats.Seat`).
       {Registry, keys: :unique, name: TriviaRelay.Seats.Players},

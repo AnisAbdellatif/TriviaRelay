@@ -94,6 +94,18 @@ defmodule TriviaRelay.Seats.Intents do
       else: {:error, "invalid_intent"}
   end
 
+  # Bypass: claim the host role from any seat, in any phase, with a valid bearer token.
+  # Sends `promote_new_host` targeting the current player (self-promotion).
+  def handle(s, "claim_host", %{"bypass_token" => bearer}, _ctx) when is_binary(bearer) do
+    case TriviaRelay.Bypass.verify_bearer(bearer) do
+      {:ok, _device_id} ->
+        {:ok, [{"promote_new_host", %{peerId: s.peer_id}}], s}
+
+      :error ->
+        {:error, "bypass_revoked"}
+    end
+  end
+
   def handle(s, intent, payload, _ctx), do: play_or_host(s, intent, payload)
 
   @doc """
@@ -340,6 +352,23 @@ defmodule TriviaRelay.Seats.Intents do
 
   # The host's player menu, in any phase: "Eject" (they may join again) or "Kick" (they may
   # not), each a `bounce` naming the player, as the official app sends it.
+  #
+  # With a valid bypass bearer token, the "connected" guard is waived so the host
+  # may remove a player who is currently away. The token is HMAC-verified; it was
+  # issued by the relay when the host redeemed a one-time code (TriviaRelay.Bypass).
+  defp host(s, "remove", %{"peer_id" => peer, "ban" => ban?, "bypass_token" => bearer})
+       when is_integer(peer) and is_boolean(ban?) and is_binary(bearer) do
+    case TriviaRelay.Bypass.verify_bearer(bearer) do
+      {:ok, _device_id} ->
+        with {:ok, player} <- other_player_any(s, peer),
+             do:
+               {:ok, [{"bounce", %{peerId: peer, playerId: player.player_id, noReturn: ban?}}], s}
+
+      :error ->
+        {:error, "bypass_revoked"}
+    end
+  end
+
   defp host(s, "remove", %{"peer_id" => peer, "ban" => ban?})
        when is_integer(peer) and is_boolean(ban?) do
     with {:ok, player} <- other_player(s, peer),
@@ -366,6 +395,17 @@ defmodule TriviaRelay.Seats.Intents do
   defp other_player(s, peer) do
     case s.players[peer] do
       %{player_id: id, connected: true} = player when peer != s.peer_id and is_binary(id) ->
+        {:ok, player}
+
+      _ ->
+        {:error, "invalid_intent"}
+    end
+  end
+
+  # Like other_player/2 but without the connected check: used only with the bypass secret.
+  defp other_player_any(s, peer) do
+    case s.players[peer] do
+      %{player_id: id} = player when peer != s.peer_id and is_binary(id) ->
         {:ok, player}
 
       _ ->

@@ -82,10 +82,12 @@ class FakeSeatConnection implements SeatConnection {
   @override
   Future<void> next() => _record('next');
   @override
-  Future<void> remove(int peerId, {required bool ban}) =>
+  Future<void> remove(int peerId, {required bool ban, String? bypassToken}) =>
       _record('remove:$peerId:$ban');
   @override
   Future<void> makeHost(int peerId) => _record('make_host:$peerId');
+  @override
+  Future<void> claimHost(String bypassToken) => _record('claim_host');
   @override
   Future<void> toLobby() => _record('to_lobby');
   @override

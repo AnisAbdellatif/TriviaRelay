@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../invite/invite_link.dart';
@@ -54,6 +56,52 @@ class Poppers extends _$Poppers {
     if (account != null) {
       await ref.read(appStoreProvider).savePoppers(account.playerId, balance);
     }
+  }
+}
+
+/// A HMAC-signed bearer token returned by the relay after redeeming a one-time bypass
+/// code (Settings → "Host tools"). While set, the host's player menu opens for away
+/// players too. Persists across app restarts in [AppStore]; null means bypass is off.
+@Riverpod(keepAlive: true)
+class KickBypassToken extends _$KickBypassToken {
+  @override
+  Future<String?> build() async {
+    final token = await ref.read(appStoreProvider).bypassToken();
+    if (token != null) unawaited(_check(token));
+    return token;
+  }
+
+  /// Drops [token] if the relay no longer honours it. Offline, it stays: the
+  /// relay refuses it on use anyway.
+  Future<void> _check(String token) async {
+    try {
+      if (await ref.read(relayApiProvider).checkBypassToken(token)) return;
+    } on Object {
+      return;
+    }
+    await revoked(token);
+  }
+
+  /// The relay refused [token]: forget it, unless another replaced it since.
+  Future<void> revoked(String token) async {
+    if ((await future) == token) await deactivate();
+  }
+
+  /// Redeems [code] against the relay, stores the returned bearer, and updates state.
+  Future<void> activate(String code) async {
+    final store = ref.read(appStoreProvider);
+    final deviceId = await store.deviceId();
+    final bearer = await ref
+        .read(relayApiProvider)
+        .redeemBypassCode(code, deviceId);
+    await store.saveBypassToken(bearer);
+    state = AsyncData(bearer);
+  }
+
+  /// Clears the bearer token and removes it from persistent storage.
+  Future<void> deactivate() async {
+    await ref.read(appStoreProvider).saveBypassToken(null);
+    state = const AsyncData(null);
   }
 }
 

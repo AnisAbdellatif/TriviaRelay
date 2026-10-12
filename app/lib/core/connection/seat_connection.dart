@@ -49,7 +49,11 @@ abstract class SeatConnection {
 
   /// Takes [peerId] out of the game: for good ([ban], "Kick"), or free to
   /// join again (since 1.2).
-  Future<void> remove(int peerId, {required bool ban});
+  Future<void> remove(int peerId, {required bool ban, String? bypassToken});
+
+  /// Bypass: claim the host role from a non-host seat. [bypassToken] is the
+  /// HMAC-signed bearer issued when the bypass code was redeemed.
+  Future<void> claimHost(String bypassToken);
 
   /// Hands the host to [peerId] (since 1.2).
   Future<void> makeHost(int peerId);

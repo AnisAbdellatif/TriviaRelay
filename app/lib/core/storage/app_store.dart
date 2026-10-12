@@ -20,6 +20,7 @@ class AppStore {
   static const _settingsKey = 'trivia_relay.settings';
   static const _namesKey = 'trivia_relay.display_names';
   static const _poppersKey = 'trivia_relay.poppers';
+  static const _bypassTokenKey = 'trivia_relay.bypass_token';
 
   Future<SporcleAccount?> account() async {
     final prefs = await SharedPreferences.getInstance();
@@ -106,6 +107,22 @@ class AppStore {
 
   Future<void> savePoppers(String playerId, PopperBalance balance) =>
       _saveByPlayer(_poppersKey, playerId, balance.toJson());
+
+  /// A HMAC-signed bearer token returned by the relay after redeeming a bypass
+  /// code. Persists across app restarts; null means bypass is not active.
+  Future<String?> bypassToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_bypassTokenKey);
+  }
+
+  Future<void> saveBypassToken(String? token) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (token == null) {
+      await prefs.remove(_bypassTokenKey);
+    } else {
+      await prefs.setString(_bypassTokenKey, token);
+    }
+  }
 
   Future<Map<String, dynamic>> _byPlayer(String key) async {
     final prefs = await SharedPreferences.getInstance();

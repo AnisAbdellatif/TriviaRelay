@@ -54,7 +54,8 @@ defmodule TriviaRelayWeb.SeatChannel do
     "invalid_intent" => "Unknown request.",
     "spectating" => "You're hosting as a spectator.",
     "too_many_votes" => "You can vote for up to 5 packs a game.",
-    "draft_pack" => "That pack is a draft. Make it live first."
+    "draft_pack" => "That pack is a draft. Make it live first.",
+    "bypass_revoked" => "Bypass access was revoked."
   }
 
   @impl true

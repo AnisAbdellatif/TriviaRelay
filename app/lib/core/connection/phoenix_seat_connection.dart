@@ -193,11 +193,18 @@ class PhoenixSeatConnection implements SeatConnection {
   Future<void> next() => _push('next', const {});
 
   @override
-  Future<void> remove(int peerId, {required bool ban}) =>
-      _push('remove', {'peer_id': peerId, 'ban': ban});
+  Future<void> remove(int peerId, {required bool ban, String? bypassToken}) {
+    final payload = <String, dynamic>{'peer_id': peerId, 'ban': ban};
+    if (bypassToken != null) payload['bypass_token'] = bypassToken;
+    return _push('remove', payload);
+  }
 
   @override
   Future<void> makeHost(int peerId) => _push('make_host', {'peer_id': peerId});
+
+  @override
+  Future<void> claimHost(String bypassToken) =>
+      _push('claim_host', {'bypass_token': bypassToken});
 
   @override
   Future<void> toLobby() => _push('to_lobby', const {});

@@ -239,6 +239,37 @@ class RelayApi {
     );
   }
 
+  /// Redeems a one-time bypass code. Returns the bearer token to store in
+  /// [AppStore.saveBypassToken]. Throws [GameError] on failure (codes:
+  /// `not_found`, `already_used`, `bypass_disabled`).
+  Future<String> redeemBypassCode(String code, String deviceId) async {
+    final body = await _send(
+      _client.post(
+        _uri('/api/bypass/redeem'),
+        headers: _json,
+        body: jsonEncode({'code': code, 'device_id': deviceId}),
+      ),
+    );
+    return body['bearer'] as String;
+  }
+
+  /// Whether the relay still honours [bearer]: false once it is revoked or
+  /// expired. Throws [GameError] when the relay can't say.
+  Future<bool> checkBypassToken(String bearer) async {
+    try {
+      await _send(
+        _client.get(
+          _uri('/api/bypass/check'),
+          headers: {'x-bypass-token': bearer},
+        ),
+      );
+      return true;
+    } on GameError catch (error) {
+      if (error.code == 'bypass_revoked') return false;
+      rethrow;
+    }
+  }
+
   void close() => _client.close();
 
   static const _json = {'content-type': 'application/json'};

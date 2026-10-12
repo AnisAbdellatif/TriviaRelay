@@ -66,6 +66,18 @@ Docker reads it **literally**: no quotes around values, no `$VAR`, no `export`. 
 `SECRET_KEY_BASE` locally with `mix phx.gen.secret` (in `server/`); `SPORCLE_API_KEY` is
 explained in [`server/.env.example`](../server/.env.example).
 
+Beside the `.env`, `data/` keeps the bypass codes (`BYPASS_DETS_PATH`, mounted at `/app/data`) across
+deploys. The relay runs as `nobody` (65534) and writes there, so create it before the first
+deploy with the volume; a directory Docker creates itself belongs to root, the relay can't
+open its codes, and the deploy rolls back:
+
+```bash
+ssh -t <you>@<host> sudo install -d -o 65534 -g 65534 -m 700 /srv/trivia-relay/data
+```
+
+`ADMIN_PASSWORD` in the `.env` turns the admin panel (`https://<PHX_HOST>/admin`) and the
+bypass on; without it both are off.
+
 **Invite links on Android.** `https://<PHX_HOST>/join/<code>` opens the web app anywhere.
 For the released Android app to open it instead, Android must find the release key's
 fingerprint at `https://<PHX_HOST>/.well-known/assetlinks.json`: set
