@@ -151,21 +151,25 @@ class _EndedView extends StatelessWidget {
         children: actions,
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 40),
+          const SizedBox(height: 60),
           // The mark with its legs apart: nobody is holding this seat now.
-          Transform.translate(
-            offset: const Offset(-24, 0),
-            child: const FzMark(size: 150, faded: true),
-          ),
+          const Opacity(opacity: .35, child: FzMark(size: 120, faded: true)),
           const SizedBox(height: 18),
           Semantics(
             header: true,
-            child: Text(title, key: const Key('closedTitle'), style: fz.t(36)),
+            child: Text(
+              title,
+              key: const Key('closedTitle'),
+              textAlign: TextAlign.center,
+              style: fz.display(34),
+            ),
           ),
           const SizedBox(height: 14),
-          Text(text, style: fz.m(15, color: FzColors.dim, height: 1.55)),
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 300),
+            child: Text(text, textAlign: TextAlign.center, style: fz.body()),
+          ),
         ],
       ),
     );

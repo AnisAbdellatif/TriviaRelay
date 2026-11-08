@@ -13,7 +13,7 @@ import '../../shared/widgets/fz_direction.dart';
 /// the bytes; it shows them as plain `<img>` elements instead. Android fetches
 /// them as usual, decoded at the size they're shown.
 class PackImage extends StatelessWidget {
-  const PackImage({super.key, required this.url, this.size = 64});
+  const PackImage({super.key, required this.url, this.size = 52});
 
   final String? url;
   final double size;
@@ -22,7 +22,7 @@ class PackImage extends StatelessWidget {
   Widget build(BuildContext context) {
     final url = this.url;
     final placeholder = ColoredBox(
-      color: FzColors.bgGlow,
+      color: FzColors.panel,
       child: Center(
         child: Icon(
           Icons.quiz_outlined,
@@ -32,7 +32,7 @@ class PackImage extends StatelessWidget {
       ),
     );
     return ClipRRect(
-      borderRadius: BorderRadius.circular(size * .2),
+      borderRadius: BorderRadius.circular(size * .27),
       child: SizedBox.square(
         dimension: size,
         child: url == null
@@ -79,66 +79,64 @@ class PackTile extends StatelessWidget {
     return FzTile(
       key: Key('pack-${pack.id}'),
       onTap: onTap,
-      child: FzPanel(
-        borderColor: selected ? FzColors.ac : null,
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            PackImage(url: pack.imageUrl),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+      framed: true,
+      accent: selected ? FzColors.ac : null,
+      child: Row(
+        children: [
+          PackImage(url: pack.imageUrl),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FzDirection(
+                  text: pack.name,
+                  child: Text(
+                    pack.name.trim(),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: fz.h(16, weight: FontWeight.w700, height: 1.2),
+                  ),
+                ),
+                if (description.isNotEmpty) ...[
+                  const SizedBox(height: 2),
                   FzDirection(
-                    text: pack.name,
+                    text: description,
                     child: Text(
-                      pack.name.trim(),
-                      maxLines: 2,
+                      description,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: fz.h(15.5, weight: FontWeight.w700),
+                      style: fz.small(13),
                     ),
                   ),
-                  if (description.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    FzDirection(
-                      text: description,
-                      child: Text(
-                        description,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: fz.m(12, color: FzColors.dim),
-                      ),
-                    ),
-                  ],
-                  const SizedBox(height: 5),
-                  FzTag(packFacts(pack)),
                 ],
+                const SizedBox(height: 6),
+                FzTag(packFacts(pack)),
+              ],
+            ),
+          ),
+          if (trailing != null) ...[const SizedBox(width: 10), trailing!],
+          if (selected && trailing == null)
+            const Padding(
+              padding: EdgeInsets.only(left: 10),
+              child: Icon(
+                Icons.check,
+                color: FzColors.ac,
+                semanticLabel: 'Chosen',
               ),
             ),
-            if (trailing != null) ...[const SizedBox(width: 10), trailing!],
-            if (selected && trailing == null)
-              const Padding(
-                padding: EdgeInsets.only(left: 10),
-                child: Icon(
-                  Icons.check_circle,
-                  color: FzColors.ac,
-                  semanticLabel: 'Chosen',
-                ),
+          if (onMore != null)
+            IconButton(
+              key: Key('packMore-${pack.id}'),
+              tooltip: 'More about ${pack.name.trim()}',
+              onPressed: onMore,
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              icon: Icon(
+                pack.bookmarked == true ? Icons.bookmark : Icons.more_horiz,
+                color: pack.bookmarked == true ? FzColors.ac : FzColors.dim,
               ),
-            if (onMore != null)
-              IconButton(
-                key: Key('packMore-${pack.id}'),
-                tooltip: 'More about ${pack.name.trim()}',
-                onPressed: onMore,
-                constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
-                icon: Icon(
-                  pack.bookmarked == true ? Icons.bookmark : Icons.more_horiz,
-                  color: pack.bookmarked == true ? FzColors.ac : FzColors.dim,
-                ),
-              ),
-          ],
-        ),
+            ),
+        ],
       ),
     );
   }

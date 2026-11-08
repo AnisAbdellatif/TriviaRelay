@@ -91,7 +91,6 @@ class _GameScreenState extends ConsumerState<GameScreen> {
   /// asked first, as in the official app; and leaving, when the top bar has
   /// no room for its own button ([withLeave]).
   Future<void> _menu(bool withLeave) async {
-    final fz = FzTheme.of(context);
     final state = ref.read(seatStateProvider).value;
     final host = state != null && _hostMenu(state);
     final choice = await showModalBottomSheet<String>(
@@ -104,27 +103,21 @@ class _GameScreenState extends ConsumerState<GameScreen> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
+              const FzSheetHeading('Game'),
               if (host)
-                ListTile(
+                FzMenuRow(
                   key: const Key('toLobbyItem'),
-                  minTileHeight: 56,
-                  leading: const Icon(Icons.meeting_room_outlined),
-                  title: Text('Back to the lobby', style: fz.h(16)),
-                  subtitle: Text(
-                    'End this game for everyone',
-                    style: fz.m(12, color: FzColors.dim),
-                  ),
+                  icon: Icons.meeting_room_outlined,
+                  label: const Text('Back to the lobby'),
+                  detail: 'End this game for everyone',
                   onTap: () => Navigator.of(context).pop('lobby'),
                 ),
               if (withLeave)
-                ListTile(
+                FzMenuRow(
                   key: const Key('leaveItem'),
-                  minTileHeight: 56,
-                  leading: const Icon(Icons.logout, color: FzColors.ac2),
-                  title: Text(
-                    'Leave the game',
-                    style: fz.h(16, color: FzColors.ac2),
-                  ),
+                  icon: Icons.logout,
+                  color: FzColors.ac2,
+                  label: const Text('Leave the game'),
                   onTap: () => Navigator.of(context).pop('leave'),
                 ),
             ],
@@ -363,55 +356,38 @@ class _StatusBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
     final Widget child;
     switch (state.status) {
       case SeatStatus.connecting:
-        child = const Padding(
-          padding: EdgeInsets.symmetric(vertical: 6),
-          child: FzWaiting('Joining the game…'),
+        child = FzBanner(
+          tone: FzColors.ink,
+          margin: EdgeInsets.zero,
+          leading: FzBanner.dot(FzColors.ac, pulse: true),
+          title: const Text('Joining the game…'),
         );
       case SeatStatus.lost:
-        child = Container(
-          key: const Key('lostBanner'),
-          padding: const EdgeInsets.fromLTRB(14, 10, 10, 10),
-          decoration: BoxDecoration(
-            color: FzColors.ac2.withValues(alpha: .12),
-            border: Border.all(color: FzColors.ac2, width: 1.5),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Semantics(
-            liveRegion: true,
-            child: Wrap(
-              crossAxisAlignment: WrapCrossAlignment.center,
-              alignment: WrapAlignment.spaceBetween,
-              spacing: 12,
-              runSpacing: 8,
-              children: [
-                Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Lost the game', style: fz.h(15, color: FzColors.ac2)),
-                    const SizedBox(height: 2),
-                    Text(
-                      "The relay can't get back in by itself.",
-                      style: fz.m(12, color: FzColors.ink, height: 1.35),
-                    ),
-                  ],
-                ),
-                FzButton(
-                  key: const Key('rejoinButton'),
-                  label: rejoining ? 'Rejoining…' : 'Rejoin',
-                  kind: FzButtonKind.pink,
-                  expand: false,
-                  height: 44,
-                  fontSize: 15,
-                  radius: 12,
-                  busy: rejoining,
-                  onPressed: onRejoin,
-                ),
-              ],
+        child = Semantics(
+          liveRegion: true,
+          child: FzBanner(
+            key: const Key('lostBanner'),
+            margin: EdgeInsets.zero,
+            leading: const Icon(
+              Icons.error_outline,
+              color: FzColors.ac2,
+              size: 22,
+            ),
+            title: const Text('Lost the game'),
+            detail: "The relay can't get back in by itself.",
+            trailing: FzButton(
+              key: const Key('rejoinButton'),
+              label: rejoining ? 'Rejoining…' : 'Rejoin',
+              kind: FzButtonKind.pink,
+              expand: false,
+              height: 44,
+              fontSize: 14,
+              radius: 14,
+              busy: rejoining,
+              onPressed: onRejoin,
             ),
           ),
         );
@@ -423,7 +399,7 @@ class _StatusBanner extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 6, 22, 2),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
           child: child,
         ),
       ),

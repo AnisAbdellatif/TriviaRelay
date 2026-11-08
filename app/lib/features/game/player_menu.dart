@@ -9,6 +9,7 @@ import '../../core/providers/connection_providers.dart';
 import '../../core/providers/settings_providers.dart';
 import '../../shared/seat_flow.dart';
 import '../../shared/theme/fz_theme.dart';
+import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
 import '../../shared/widgets/fz_toast.dart';
 import 'game_effects.dart';
@@ -216,17 +217,13 @@ class _PlayerMenu extends StatelessWidget {
       String detail, {
       Color color = FzColors.ink,
       bool enabled = true,
-    }) => ListTile(
+    }) => FzMenuRow(
       key: Key('playerAction-${action.name}'),
-      minTileHeight: 56,
-      enabled: enabled,
-      leading: Icon(icon, color: enabled ? color : FzColors.faint),
-      title: Text(
-        label,
-        style: fz.h(16, color: enabled ? color : FzColors.dim),
-      ),
-      subtitle: Text(detail, style: fz.m(12, color: FzColors.dim)),
-      onTap: () => Navigator.of(context).pop(action),
+      icon: icon,
+      color: color,
+      label: Text(label),
+      detail: detail,
+      onTap: enabled ? () => Navigator.of(context).pop(action) : null,
     );
 
     final reactions = player.reactions.total;
@@ -237,27 +234,43 @@ class _PlayerMenu extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Container(
+              margin: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+              padding: const EdgeInsets.only(top: 4, bottom: 10),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: FzColors.line)),
+              ),
+              child: Row(
                 children: [
-                  FzDirection(
-                    text: player.name,
-                    child: Text(
-                      player.name.trim(),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: fz.h(20),
+                  FzAvatar(
+                    id: '${player.peerId}',
+                    name: player.name,
+                    away: !player.connected,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        FzDirection(
+                          text: player.name,
+                          child: Text(
+                            player.name.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: fz.heading(),
+                          ),
+                        ),
+                        if (reactions > 0)
+                          Text(
+                            reactions == 1
+                                ? '1 reaction this game'
+                                : '$reactions reactions this game',
+                            style: fz.small(),
+                          ),
+                      ],
                     ),
                   ),
-                  if (reactions > 0)
-                    Text(
-                      reactions == 1
-                          ? '1 reaction this game'
-                          : '$reactions reactions this game',
-                      style: fz.m(12, color: FzColors.dim),
-                    ),
                 ],
               ),
             ),
@@ -271,6 +284,8 @@ class _PlayerMenu extends StatelessWidget {
                 enabled: canReact,
               ),
             if (host) ...[
+              const SizedBox(height: 6),
+              const FzSheetHeading('Host only'),
               if (!awayBypass)
                 item(
                   PlayerAction.makeHost,

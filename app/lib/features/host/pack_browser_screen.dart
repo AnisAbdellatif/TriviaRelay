@@ -182,16 +182,10 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 0),
-                    child: Row(
-                      children: [
-                        FzCircleButton(
-                          icon: Icons.arrow_back,
-                          tooltip: 'Back',
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text('Pick a pack', style: fz.t(28))),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                    child: FzHeaderRow(
+                      title: 'Pick a pack',
+                      actions: [
                         FzCircleButton(
                           key: const Key('randomPackButton'),
                           icon: Icons.casino_outlined,
@@ -202,7 +196,7 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 14, 22, 10),
+                    padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
                     child: TextField(
                       key: const Key('packSearchField'),
                       controller: _query,
@@ -241,32 +235,28 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
                   // under 48px.
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 22),
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
                     child: Row(
                       children: [
                         for (final list in PackList.values)
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
-                            child: ChoiceChip(
+                            child: fzChoiceChip(
                               key: Key('packList-${list.name}'),
-                              label: Text(_label(list), style: fz.m(13)),
+                              label: _label(list),
                               selected: list == _list,
                               onSelected: (_) => _choose(list),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 6,
-                                vertical: 8,
-                              ),
                             ),
                           ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 4),
                   Expanded(
                     child: ListView.builder(
                       key: const Key('packList'),
                       controller: _scroll,
-                      padding: const EdgeInsets.fromLTRB(22, 6, 22, 22),
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 22),
                       itemCount: _packs.length + 1,
                       itemBuilder: (context, i) {
                         if (i == _packs.length) return _footer(fz);
@@ -296,46 +286,58 @@ class _PackBrowserScreenState extends ConsumerState<PackBrowserScreen> {
   Widget _footer(FzTheme fz) {
     final Widget child;
     if (_error != null) {
-      child = Column(
-        children: [
-          Text("Couldn't load packs.", style: fz.m(13, color: FzColors.dim)),
-          const SizedBox(height: 10),
-          FzButton(
-            key: const Key('retryPacksButton'),
-            label: 'Try again',
-            kind: FzButtonKind.outline,
-            height: 44,
-            onPressed: _retry,
-          ),
-        ],
+      child = FzNotice(
+        icon: Icons.cloud_off_outlined,
+        title: "Couldn't load packs.",
+        action: FzButton(
+          key: const Key('retryPacksButton'),
+          label: 'Try again',
+          kind: FzButtonKind.outline,
+          expand: false,
+          height: 48,
+          fontSize: 16,
+          radius: 14,
+          onPressed: _retry,
+        ),
       );
+    } else if (_packs.isEmpty && _loading) {
+      child = const FzSkeletonRows();
     } else if (_loading || _nextPage != null) {
-      child = const SizedBox.square(
-        dimension: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
+      child = const Center(child: FzWaiting('Loading more'));
     } else if (_packs.isEmpty) {
-      child = Text(
-        _empty,
+      child = FzNotice(
         key: const Key('noPacks'),
-        textAlign: TextAlign.center,
-        style: fz.m(13, color: FzColors.dim, height: 1.5),
+        icon: _search.isEmpty ? Icons.inbox_outlined : Icons.search_off,
+        title: _emptyTitle,
+        detail: _empty,
       );
     } else {
-      child = Text(
-        _packs.length == 1 ? '1 pack' : '${_packs.length} packs',
-        style: fz.m(12, color: FzColors.faint),
+      child = Center(
+        child: Text(
+          _packs.length == 1 ? '1 pack' : '${_packs.length} packs',
+          style: fz.small(),
+        ),
       );
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Center(child: child),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: child,
     );
   }
 
+  String get _emptyTitle => _search.isNotEmpty
+      ? 'No ${_label(_list).toLowerCase()} packs match "$_search".'
+      : switch (_list) {
+          PackList.bookmarked => 'Nothing bookmarked yet',
+          PackList.created => 'No packs made yet',
+          PackList.friends => 'No friends’ packs yet',
+          PackList.purchased => 'Nothing bought yet',
+          _ => 'No packs here',
+        };
+
   String get _empty {
     if (_search.isNotEmpty) {
-      return 'No ${_label(_list).toLowerCase()} packs match "$_search".';
+      return 'Try another word, or another list.';
     }
     return switch (_list) {
       PackList.bookmarked =>

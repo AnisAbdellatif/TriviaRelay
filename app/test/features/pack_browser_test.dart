@@ -117,8 +117,11 @@ void main() {
     await tapKey(tester, const Key('packList-bookmarked'));
     expect(find.byKey(const Key('noPacks')), findsOneWidget);
     expect(
-      tester.widget<Text>(find.byKey(const Key('noPacks'))).data,
-      contains('bookmark'),
+      find.descendant(
+        of: find.byKey(const Key('noPacks')),
+        matching: find.textContaining('bookmark'),
+      ),
+      findsWidgets,
     );
   });
 

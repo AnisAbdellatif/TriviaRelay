@@ -158,17 +158,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               FzButton(
                 key: const Key('resumeButton'),
                 label: 'Back to game ${seat.gameCode}',
-                trailing: 'your seat is held',
-                kind: FzButtonKind.pink,
+                trailing: 'seat held',
                 onPressed: _busy ? null : _resume,
               ),
-              const SizedBox(height: 11),
+              const SizedBox(height: 10),
             ],
             FzButton(
               key: const Key('hostButton'),
               label: 'Host a game',
-              trailing: 'pick a pack',
-              kind: FzButtonKind.outline,
+              // The game this phone is in comes first.
+              kind: seat == null ? FzButtonKind.primary : FzButtonKind.outline,
               onPressed: _busy
                   ? null
                   : () => Navigator.of(context).push(
@@ -180,73 +179,70 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ],
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 18),
+          padding: const EdgeInsets.only(top: 14),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // In the page rather than over the buttons, where it pushed the
               // code field off a small screen.
               const UpdateBanner(),
-              Text('Trivia Relay', style: fz.t(44)),
-              const SizedBox(height: 16),
+              Text('Trivia Relay', style: fz.display(44)),
+              const SizedBox(height: 14),
               const Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: FzAccentBars(),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               Text(
                 'Drop out, come back: your seat, your answers and your '
                 'score wait for you.',
-                style: fz.m(
-                  15,
-                  weight: FontWeight.w400,
-                  color: FzColors.dim,
-                  height: 1.6,
-                ),
+                style: fz.body(),
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 28),
               const FzEyebrow('Join a game'),
               const SizedBox(height: 10),
-              // Already 30px: at twice that, six digits ran off a small
-              // phone's field. Large text still gets half as big again.
-              MediaQuery.withClampedTextScaling(
-                maxScaleFactor: 1.5,
-                child: TextField(
-                  key: const Key('codeField'),
-                  controller: _code,
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [
-                    FilteringTextInputFormatter.digitsOnly,
-                    LengthLimitingTextInputFormatter(8),
-                  ],
-                  textAlign: TextAlign.center,
-                  style: fz.m(30, tracking: .3),
-                  // Room below it for the Join button as it scrolls into view
-                  // over the keyboard.
-                  scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
-                  decoration: InputDecoration(
-                    hintText: 'Game code',
-                    enabledBorder: fzKeyFieldBorder,
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 18,
-                      vertical: 16,
+              // The code and Join side by side; Join drops under the field
+              // when large text leaves no room beside it.
+              FzInlineAction(
+                field: MediaQuery.withClampedTextScaling(
+                  maxScaleFactor: 1.5,
+                  child: TextField(
+                    key: const Key('codeField'),
+                    controller: _code,
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [
+                      FilteringTextInputFormatter.digitsOnly,
+                      LengthLimitingTextInputFormatter(8),
+                    ],
+                    style: fz.m(22, tracking: .2),
+                    // Room below it for the Join button as it scrolls into view
+                    // over the keyboard.
+                    scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 96),
+                    decoration: InputDecoration(
+                      hintText: 'Game code',
+                      enabledBorder: fzKeyFieldBorder,
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
                     ),
+                    onChanged: (_) => setState(() {}),
+                    onSubmitted: (_) => validCode(code) ? _join() : null,
                   ),
-                  onChanged: (_) => setState(() {}),
-                  onSubmitted: (_) => validCode(code) ? _join() : null,
+                ),
+                actionWidth: 110,
+                action: FzButton(
+                  key: const Key('joinButton'),
+                  label: _busy ? 'Joining…' : 'Join',
+                  height: 56,
+                  onPressed: validCode(code) && !_busy ? _join : null,
                 ),
               ),
               const SizedBox(height: 10),
-              FzButton(
-                key: const Key('joinButton'),
-                label: _busy ? 'Joining…' : 'Join',
-                onPressed: validCode(code) && !_busy ? _join : null,
-              ),
-              const SizedBox(height: 11),
               FzButton(
                 key: const Key('browseGamesButton'),
                 label: 'Find a game',
-                trailing: 'open to join',
+                height: 56,
                 kind: FzButtonKind.outline,
                 onPressed: _busy ? null : _browse,
               ),

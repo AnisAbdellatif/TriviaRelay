@@ -28,12 +28,14 @@ class RevealView extends ConsumerWidget {
   /// The host marked it otherwise than Sporcle's exact match did.
   bool _remarked(RevealAnswer answer) => _correct(answer) != answer.correct;
 
+  /// The last regular question: next is the final round.
+  bool get _toFinal =>
+      !_final &&
+      (state.question?.index ?? 0) >= state.options.questionsPerGame - 1;
+
   String get _nextLabel {
     if (_final) return 'Show the final scores';
-    final index = state.question?.index ?? 0;
-    return index >= state.options.questionsPerGame - 1
-        ? 'On to the final round'
-        : 'Next question';
+    return _toFinal ? 'On to the final round' : 'Next question';
   }
 
   /// Moving on before the marks are confirmed scores nothing for the
@@ -109,7 +111,8 @@ class RevealView extends ConsumerWidget {
                   FzButton(
                     key: const Key('confirmMarksButton'),
                     label: 'Confirm the marks',
-                    trailing: 'scores them',
+                    trailing:
+                        '${(reveal?.answers ?? const <RevealAnswer>[]).where(mark).length} right',
                     busy: pending.containsKey('judgeSubmit'),
                     onPressed: canAct
                         ? () => act(
@@ -120,55 +123,75 @@ class RevealView extends ConsumerWidget {
                           )
                         : null,
                   ),
-                  const SizedBox(height: 11),
-                ],
-                FzButton(
-                  key: const Key('nextButton'),
-                  label: _nextLabel,
-                  trailing: judged ? null : 'without scores',
-                  kind: judged ? FzButtonKind.pink : FzButtonKind.outline,
-                  busy: pending.containsKey('next'),
-                  onPressed: canAct ? () => _next(context, ref) : null,
-                ),
+                  const SizedBox(height: 4),
+                  Center(
+                    child: TextButton(
+                      key: const Key('nextButton'),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        foregroundColor: FzColors.dim,
+                      ),
+                      onPressed: canAct && !pending.containsKey('next')
+                          ? () => _next(context, ref)
+                          : null,
+                      child: Text(
+                        _final
+                            ? 'Skip scoring the final'
+                            : 'Skip scoring this question',
+                      ),
+                    ),
+                  ),
+                ] else
+                  FzButton(
+                    key: const Key('nextButton'),
+                    label: _nextLabel,
+                    kind: _toFinal ? FzButtonKind.pink : FzButtonKind.primary,
+                    busy: pending.containsKey('next'),
+                    onPressed: canAct ? () => _next(context, ref) : null,
+                  ),
               ],
             )
           : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
+          const SizedBox(height: 4),
           if (state.question != null)
             FzDirection(
               text: state.question!.text,
               child: Text(
                 state.question!.text,
-                style: fz.h(
-                  state.question!.text.characters.length <= 3 ? 44 : 17,
-                  weight: FontWeight.w700,
-                  color: FzColors.dim,
-                  height: 1.35,
-                ),
+                style: state.question!.text.characters.length <= 3
+                    ? fz.h(44, weight: FontWeight.w700)
+                    : fz.body(16, FzColors.ink),
               ),
             ),
           const SizedBox(height: 14),
-          const FzEyebrow('The answer'),
-          const SizedBox(height: 6),
-          FzPanel(
-            color: FzColors.ac.withValues(alpha: .08),
-            borderColor: FzColors.ac,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: FzDirection(
-              text: reveal?.answer ?? '',
-              child: Text(
-                reveal?.answer ?? '…',
-                key: const Key('correctAnswer'),
-                style: fz.h(28, color: FzColors.ac),
-              ),
+          FzPanel.tone(
+            FzColors.ac,
+            padding: const EdgeInsets.all(22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FzEyebrow('The answer', color: FzColors.ac),
+                const SizedBox(height: 6),
+                FzDirection(
+                  text: reveal?.answer ?? '',
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: Text(
+                      reveal?.answer ?? '…',
+                      key: const Key('correctAnswer'),
+                      style: fz.display(host && !judged ? 44 : 34),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 8),
           QuestionFeedback(state: state),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           FzEyebrow(
             host && !judged
                 ? 'Switch on the right guesses'
@@ -176,62 +199,76 @@ class RevealView extends ConsumerWidget {
                 ? 'Marked'
                 : 'The host is marking the guesses',
           ),
-          const SizedBox(height: 6),
-          for (final answer in reveal?.answers ?? const <RevealAnswer>[])
-            if (state.player(answer.peerId) case final player?)
-              PlayerRow(
-                key: ValueKey('guess-${answer.peerId}'),
-                player: player,
-                you: player.peerId == state.you.peerId,
-                guess: answer.text ?? '',
-                note: [
-                  'wager ${answer.wager}',
-                  if (_remarked(answer)) 'marked by host',
-                ].join(' · '),
-                highlight: _remarked(answer)
-                    ? (_correct(answer) ? FzColors.ok : FzColors.ac2)
-                          .withValues(alpha: .08)
-                    : null,
-                merge: true,
-                onTap: host && !judged && canAct
-                    ? () => judge(answer, !mark(answer))
-                    : null,
-                // While the host marks, each guess is a switch: on is right.
-                // Once marked, or for everybody else, the verdict.
-                trailing: host && !judged
-                    ? Semantics(
-                        label: mark(answer) ? 'Marked right' : 'Marked wrong',
-                        // The row is the one stop for the keyboard; the switch
-                        // is there to see and to tap.
-                        child: ExcludeFocus(
-                          child: Switch(
-                            key: ValueKey('mark-${answer.peerId}'),
-                            value: mark(answer),
-                            activeTrackColor: FzColors.ok,
-                            trackOutlineColor: WidgetStateProperty.resolveWith(
-                              (states) => states.contains(WidgetState.selected)
+          const SizedBox(height: 8),
+          FzPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Column(
+              children: [
+                for (final answer in reveal?.answers ?? const <RevealAnswer>[])
+                  if (state.player(answer.peerId) case final player?)
+                    PlayerRow(
+                      key: ValueKey('guess-${answer.peerId}'),
+                      player: player,
+                      you: player.peerId == state.you.peerId,
+                      guess: answer.text ?? '',
+                      note: 'wager ${answer.wager}',
+                      tag: _remarked(answer)
+                          ? FzTag(
+                              host && !judged ? 're-marked' : 'host counted it',
+                              color: FzColors.ac,
+                            )
+                          : null,
+                      highlight: _remarked(answer)
+                          ? FzColors.ac.withValues(alpha: .07)
+                          : null,
+                      merge: true,
+                      onTap: host && !judged && canAct
+                          ? () => judge(answer, !mark(answer))
+                          : null,
+                      // While the host marks, each guess is a switch: on is right.
+                      // Once marked, or for everybody else, the verdict.
+                      trailing: host && !judged
+                          ? Semantics(
+                              label: mark(answer)
+                                  ? 'Marked right'
+                                  : 'Marked wrong',
+                              // The row is the one stop for the keyboard; the switch
+                              // is there to see and to tap.
+                              child: ExcludeFocus(
+                                child: Switch(
+                                  key: ValueKey('mark-${answer.peerId}'),
+                                  value: mark(answer),
+                                  activeTrackColor: FzColors.ok,
+                                  onChanged: canAct
+                                      ? (right) => judge(answer, right)
+                                      : null,
+                                ),
+                              ),
+                            )
+                          : Icon(
+                              _correct(answer) ? Icons.check : Icons.close,
+                              size: 22,
+                              semanticLabel: _correct(answer)
+                                  ? 'Right'
+                                  : 'Wrong',
+                              color: _correct(answer)
                                   ? FzColors.ok
-                                  : FzColors.edge,
+                                  : FzColors.ac2,
                             ),
-                            onChanged: canAct
-                                ? (right) => judge(answer, right)
-                                : null,
-                          ),
-                        ),
-                      )
-                    : Icon(
-                        _correct(answer) ? Icons.check_circle : Icons.cancel,
-                        semanticLabel: _correct(answer) ? 'Right' : 'Wrong',
-                        color: _correct(answer) ? FzColors.ok : FzColors.ac2,
-                      ),
-              ),
-          const SizedBox(height: 22),
+                    ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
           const FzEyebrow('Standings'),
-          const SizedBox(height: 6),
-          Standings(
-            state: state,
-            gains: gains,
-            onTap: (p) => managePlayer(context, ref, state, p),
+          const SizedBox(height: 8),
+          FzPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Standings(
+              state: state,
+              gains: gains,
+              onTap: (p) => managePlayer(context, ref, state, p),
+            ),
           ),
         ],
       ),

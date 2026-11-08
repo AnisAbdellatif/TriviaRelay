@@ -250,7 +250,7 @@ void main() {
     expect(
       find.descendant(
         of: find.byKey(const Key('vote-hard')),
-        matching: find.byIcon(Icons.check_circle),
+        matching: find.byIcon(Icons.check),
       ),
       findsOneWidget,
     );
@@ -402,7 +402,7 @@ void main() {
   ) async {
     await show(tester, 'final_question_player');
     expect(find.byKey(const Key('wager-1')), findsNothing);
-    expect(find.textContaining('wager'), findsWidgets);
+    expect(find.textContaining('WAGER'), findsWidgets);
   });
 
   testWidgets('the final scores name the winner; the host can play again', (
@@ -650,6 +650,6 @@ void main() {
     final connection = await show(tester, 'question_player');
     connection.emitStatus(ConnectionStatus.reconnecting);
     await settle(tester);
-    expect(find.text('RECONNECTING…'), findsOneWidget);
+    expect(find.text('Reconnecting…'), findsOneWidget);
   });
 }

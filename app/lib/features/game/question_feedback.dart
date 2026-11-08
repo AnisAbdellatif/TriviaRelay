@@ -43,23 +43,38 @@ class QuestionFeedback extends ConsumerWidget {
                   value: chosen ? 0 : value,
                 )
               : null,
-          icon: Icon(icon, color: chosen ? color : FzColors.dim),
+          icon: Icon(icon, size: 22, color: chosen ? color : FzColors.dim),
           style: IconButton.styleFrom(
-            minimumSize: const Size(48, 48),
-            backgroundColor: chosen ? color.withValues(alpha: .14) : null,
+            fixedSize: const Size.square(44),
+            minimumSize: const Size.square(44),
+            backgroundColor: chosen ? FzColors.washOf(color) : null,
+            shape: CircleBorder(
+              side: BorderSide(
+                color: chosen ? FzColors.edgeOf(color) : FzColors.edge,
+                width: 1.5,
+              ),
+            ),
           ),
         ),
       );
     }
 
+    // Thumbs at the start, Report at the end; Report wraps under them when
+    // large text leaves no room.
     return Wrap(
       key: const Key('questionFeedback'),
+      alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
-      spacing: 4,
       runSpacing: 4,
       children: [
-        thumb(1, Icons.thumb_up_outlined, 'Good question', FzColors.ok),
-        thumb(-1, Icons.thumb_down_outlined, 'Bad question', FzColors.ac2),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            thumb(1, Icons.thumb_up_outlined, 'Good question', FzColors.ok),
+            const SizedBox(width: 8),
+            thumb(-1, Icons.thumb_down_outlined, 'Bad question', FzColors.ac2),
+          ],
+        ),
         TextButton.icon(
           key: const Key('reportQuestionButton'),
           onPressed: you.reported || !canAct
@@ -68,7 +83,7 @@ class QuestionFeedback extends ConsumerWidget {
           style: TextButton.styleFrom(
             minimumSize: const Size(48, 48),
             foregroundColor: FzColors.dim,
-            textStyle: fz.m(13),
+            textStyle: fz.h(15, weight: FontWeight.w600),
           ),
           icon: Icon(you.reported ? Icons.flag : Icons.outlined_flag, size: 18),
           label: Text(you.reported ? 'Reported' : 'Report'),

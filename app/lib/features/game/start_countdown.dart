@@ -102,16 +102,29 @@ class _CountdownGateState extends ConsumerState<CountdownGate> {
             mainAxisSize: MainAxisSize.min,
             children: [
               FzEyebrow(label, color: color, size: 13),
-              const SizedBox(height: 12),
+              const SizedBox(height: 6),
               FzPop(
                 trigger: seconds,
                 scale: 1.3,
                 child: Text(
                   '$seconds',
                   key: const Key('startCountdownSeconds'),
-                  style: fz.t(120, color: color),
+                  style: fz
+                      .numeral(220, color)
+                      .copyWith(
+                        height: .9,
+                        letterSpacing: 220 * -.04,
+                        shadows: [
+                          Shadow(
+                            color: color.withValues(alpha: .35),
+                            blurRadius: 60,
+                          ),
+                        ],
+                      ),
                 ),
               ),
+              const SizedBox(height: 12),
+              FzAccentBars(flare: isFinal),
             ],
           ),
         ),

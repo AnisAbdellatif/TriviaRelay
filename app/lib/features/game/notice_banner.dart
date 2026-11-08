@@ -8,6 +8,7 @@ import '../../core/providers/config_providers.dart';
 import '../../core/providers/connection_providers.dart';
 import '../../core/time/server_clock.dart';
 import '../../shared/theme/fz_theme.dart';
+import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
 import '../../shared/widgets/fz_motion.dart';
 
@@ -84,7 +85,6 @@ class _NoticeBannerState extends ConsumerState<NoticeBanner> {
 
   @override
   Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
     final notice = widget.notice;
     // A kind this app doesn't know shows only with words of its own.
     final show =
@@ -105,52 +105,21 @@ class _NoticeBannerState extends ConsumerState<NoticeBanner> {
         'success' => FzColors.ok,
         _ => FzColors.ac,
       };
-      return Container(
-        key: const Key('noticeBanner'),
-        margin: const EdgeInsets.fromLTRB(22, 6, 22, 2),
-        padding: const EdgeInsets.fromLTRB(14, 4, 4, 4),
-        decoration: BoxDecoration(
-          color: tone.withValues(alpha: .1),
-          border: Border.all(color: tone, width: 1.5),
-          borderRadius: BorderRadius.circular(14),
-        ),
-        child: Semantics(
-          liveRegion: true,
-          child: Row(
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (title.isNotEmpty)
-                        FzDirection(
-                          text: title,
-                          child: Text(title, style: fz.h(15, color: tone)),
-                        ),
-                      if (message.isNotEmpty) ...[
-                        const SizedBox(height: 2),
-                        FzDirection(
-                          text: message,
-                          child: Text(
-                            message,
-                            style: fz.m(12, color: FzColors.ink, height: 1.35),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-              IconButton(
-                key: const Key('closeNoticeButton'),
-                tooltip: 'Close',
-                icon: const Icon(Icons.close, color: FzColors.dim, size: 20),
-                onPressed: () => setState(() => _closed = notice),
-              ),
-            ],
+      return Semantics(
+        liveRegion: true,
+        child: FzBanner(
+          key: const Key('noticeBanner'),
+          tone: tone,
+          margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          title: title.isEmpty
+              ? const SizedBox.shrink()
+              : FzDirection(text: title, child: Text(title)),
+          detail: message.isEmpty ? null : message,
+          trailing: IconButton(
+            key: const Key('closeNoticeButton'),
+            tooltip: 'Close',
+            icon: const Icon(Icons.close, color: FzColors.dim, size: 20),
+            onPressed: () => setState(() => _closed = notice),
           ),
         ),
       );

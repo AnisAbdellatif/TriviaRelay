@@ -450,7 +450,7 @@ void main() {
     testWidgets('a player votes, and takes a vote back', (tester) async {
       final connection = await show(tester, snapshot('lobby_player_votes'));
       expect(find.text('World Capitals'), findsOneWidget);
-      expect(find.text('4 of 5 left'), findsOneWidget);
+      expect(find.text('4 OF 5 LEFT'), findsOneWidget);
       await tapKey(tester, const Key('packVote-1001'));
       expect(connection.calls, contains('pack_vote:1001:true'));
       await tapKey(tester, const Key('packVote-268682'));
@@ -472,7 +472,13 @@ void main() {
         overrides: _relay(requests),
       );
       expect(find.byKey(const Key('votePackButton')), findsNothing);
-      expect(find.text('2 VOTES'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('packVote-268682')),
+          matching: find.text('2'),
+        ),
+        findsOneWidget,
+      );
       await tapKey(tester, const Key('packVote-268682'));
       expect(requests, [
         'POST /api/seats/pack {"seat_token":"tok1","pack_id":268682}',
