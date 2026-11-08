@@ -8,6 +8,7 @@ import '../../core/providers/config_providers.dart';
 import '../../core/providers/connection_providers.dart';
 import '../../core/time/server_clock.dart';
 import '../theme/fz_theme.dart';
+import 'fz.dart';
 import 'fz_motion.dart';
 
 /// Question timer from the absolute server [deadline] corrected by the server
@@ -129,70 +130,87 @@ class _CountdownState extends ConsumerState<Countdown> {
       child: FzTint(
         color: target,
         builder: (context, color) {
-          final label = AnimatedScale(
-            // Grows toward the bar, never off the edge of the screen.
-            alignment: Alignment.centerRight,
-            scale: finale ? 2 : 1,
-            duration: quick,
-            curve: Curves.easeOutBack,
-            child: FzPop(
-              trigger: warning ? seconds : null,
-              scale: finale ? 1.4 : 1.25,
-              duration: Duration(milliseconds: finale ? 340 : 260),
+          // Left, what the clock is doing; right, the seconds, large.
+          final caption = paused
+              ? FzEyebrow('Paused · ${seconds}s', color: FzColors.dim)
+              : over
+              ? Text("Time's up", style: fz.heading())
+              : FzEyebrow(warning ? 'Hurry' : 'Seconds', color: color);
+          final number = FzPop(
+            trigger: warning ? seconds : null,
+            scale: finale ? 1.3 : 1.2,
+            duration: Duration(milliseconds: finale ? 340 : 280),
+            child: AnimatedDefaultTextStyle(
+              duration: quick,
+              curve: Curves.easeOutBack,
+              style: fz
+                  .numeral(
+                    finale ? 64 : 44,
+                    paused || over
+                        ? FzColors.dim
+                        : warning
+                        ? color
+                        : FzColors.ink,
+                  )
+                  .copyWith(
+                    shadows: finale
+                        ? [
+                            Shadow(
+                              color: color.withValues(alpha: .6),
+                              blurRadius: 24,
+                            ),
+                          ]
+                        : null,
+                  ),
               child: Text(
-                paused
-                    ? 'PAUSED · ${seconds}s'
-                    : over
-                    ? "Time's up"
-                    : '$seconds',
+                over ? '0' : '$seconds',
                 key: const Key('countdown'),
                 semanticsLabel: paused || over
-                    ? null
+                    ? (paused ? 'Paused, $seconds seconds left' : "Time's up")
                     : '$seconds second${seconds == 1 ? '' : 's'} left',
-                style: fz
-                    .m(15, color: color)
-                    .copyWith(
-                      shadows: finale
-                          ? [
-                              Shadow(
-                                color: color.withValues(alpha: .7),
-                                blurRadius: 12,
-                              ),
-                            ]
-                          : null,
-                    ),
               ),
             ),
           );
-
-          final limit = widget.timeLimitMs;
-          if (limit == null || limit <= 0) return label;
-          return Row(
+          final head = Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Expanded(
-                child: FzFlash(
-                  key: const Key('countdownBar'),
-                  trigger: finale ? seconds : null,
-                  color: color,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(999),
-                    child: AnimatedContainer(
-                      duration: quick,
-                      height: finale ? 8 : 5,
-                      color: FzColors.track,
-                      alignment: Alignment.centerLeft,
-                      child: AnimatedFractionallySizedBox(
-                        duration: const Duration(milliseconds: 250),
-                        widthFactor: (ms / limit).clamp(0.0, 1.0),
-                        heightFactor: 1,
-                        child: ColoredBox(color: color),
-                      ),
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 6),
+                  child: caption,
+                ),
+              ),
+              number,
+            ],
+          );
+
+          final limit = widget.timeLimitMs;
+          if (limit == null || limit <= 0) return head;
+          return Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              head,
+              const SizedBox(height: 6),
+              FzFlash(
+                key: const Key('countdownBar'),
+                trigger: finale ? seconds : null,
+                color: color,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: Container(
+                    height: 8,
+                    color: FzColors.track,
+                    alignment: Alignment.centerLeft,
+                    child: AnimatedFractionallySizedBox(
+                      duration: const Duration(milliseconds: 250),
+                      widthFactor: (ms / limit).clamp(0.0, 1.0),
+                      heightFactor: 1,
+                      child: ColoredBox(color: paused ? FzColors.dim : color),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 20),
-              label,
             ],
           );
         },

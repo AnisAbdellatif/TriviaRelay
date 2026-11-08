@@ -116,18 +116,13 @@ class _NoRelayScreen extends StatelessWidget {
             children: [
               const FzEyebrow('This build is not set up'),
               const SizedBox(height: 14),
-              Text('No relay', style: fz.t(44)),
+              Text('No relay', style: fz.display(44)),
               const SizedBox(height: 18),
               Text(
                 'This copy of Trivia Relay was built without the address of '
                 'its relay, so it has nowhere to sign you in. Install the '
                 'release from GitHub instead.',
-                style: fz.m(
-                  15,
-                  weight: FontWeight.w400,
-                  color: FzColors.dim,
-                  height: 1.6,
-                ),
+                style: fz.body(),
               ),
             ],
           ),

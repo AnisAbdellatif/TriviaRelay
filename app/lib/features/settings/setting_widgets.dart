@@ -78,36 +78,39 @@ class _DisplayNameFieldState extends ConsumerState<DisplayNameField> {
       children: [
         const FzEyebrow('Name other players see'),
         const SizedBox(height: 8),
-        FzDirection(
-          text: _name.text,
-          child: TextField(
-            key: const Key('displayNameField'),
-            controller: _name,
-            maxLength: DisplayNameField.maxLength,
-            textInputAction: TextInputAction.done,
-            decoration: InputDecoration(
-              hintText: account?.handle ?? 'Your name',
-              counterText: '',
+        FzInlineAction(
+          field: FzDirection(
+            text: _name.text,
+            child: TextField(
+              key: const Key('displayNameField'),
+              controller: _name,
+              maxLength: DisplayNameField.maxLength,
+              textInputAction: TextInputAction.done,
+              decoration: InputDecoration(
+                hintText: account?.handle ?? 'Your name',
+                counterText: '',
+              ),
+              onChanged: (_) => setState(() {}),
+              onSubmitted: (_) => changed ? _save() : null,
             ),
-            onChanged: (_) => setState(() {}),
-            onSubmitted: (_) => changed ? _save() : null,
+          ),
+          action: FzButton(
+            key: const Key('saveNameButton'),
+            label: 'Save',
+            kind: FzButtonKind.outline,
+            expand: false,
+            height: 56,
+            fontSize: 16,
+            radius: 16,
+            busy: _saving,
+            onPressed: changed ? _save : null,
           ),
         ),
-        const SizedBox(height: 6),
+        const SizedBox(height: 8),
         Text(
           'Your Sporcle handle unless you choose another. It shows from the '
           'next game you join or host.',
-          style: fz.m(12, color: FzColors.faint, height: 1.5),
-        ),
-        const SizedBox(height: 10),
-        FzButton(
-          key: const Key('saveNameButton'),
-          label: _saving ? 'Saving…' : 'Save the name',
-          kind: FzButtonKind.outline,
-          height: 48,
-          fontSize: 15,
-          busy: _saving,
-          onPressed: changed ? _save : null,
+          style: fz.small(),
         ),
       ],
     );
@@ -136,34 +139,34 @@ class GameFeedbackSwitches extends ConsumerWidget {
         contentPadding: EdgeInsets.zero,
         value: value,
         onChanged: (on) => notifier.change((_) => change(on)),
-        title: Text(title, style: fz.m(15, weight: FontWeight.w600)),
-        subtitle: Text(
-          subtitle,
-          style: fz.m(12, color: FzColors.dim, height: 1.4),
-        ),
+        title: Text(title, style: fz.h(16, weight: FontWeight.w700)),
+        subtitle: Text(subtitle, style: fz.small(13)),
       ),
     );
 
-    return Column(
-      children: [
-        toggle(
-          const Key('soundSwitch'),
-          'Sounds',
-          'A question opening, your answer in, right or wrong, the last '
-              'seconds.',
-          settings.sound,
-          (on) => settings.copyWith(sound: on),
-        ),
-        // A browser has no buzz to give.
-        if (!kIsWeb)
+    return FzPanel(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+      child: Column(
+        children: [
           toggle(
-            const Key('hapticsSwitch'),
-            'Vibration',
-            'A buzz with the same moments.',
-            settings.haptics,
-            (on) => settings.copyWith(haptics: on),
+            const Key('soundSwitch'),
+            'Sounds',
+            'A question opening, your answer in, right or wrong, the last '
+                'seconds.',
+            settings.sound,
+            (on) => settings.copyWith(sound: on),
           ),
-      ],
+          // A browser has no buzz to give.
+          if (!kIsWeb)
+            toggle(
+              const Key('hapticsSwitch'),
+              'Vibration',
+              'A buzz with the same moments.',
+              settings.haptics,
+              (on) => settings.copyWith(haptics: on),
+            ),
+        ],
+      ),
     );
   }
 }

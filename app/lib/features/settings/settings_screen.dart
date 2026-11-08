@@ -75,50 +75,85 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final account = ref.watch(accountProvider).value;
+    final seat = ref.watch(currentSeatProvider).value;
 
     return Scaffold(
       body: FzPage(
-        header: Row(
-          children: [
-            FzCircleButton(
-              icon: Icons.arrow_back,
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: FzEyebrow('Settings')),
-          ],
-        ),
+        header: const FzHeaderRow(title: 'Settings', eyebrow: true),
         footer: FzButton(
           key: const Key('signOutButton'),
           label: _signingOut ? 'Signing out…' : 'Sign out',
-          kind: FzButtonKind.outline,
+          kind: FzButtonKind.danger,
           onPressed: _signingOut ? null : _signOut,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 16),
-            const FzEyebrow('Sporcle account'),
             const SizedBox(height: 8),
-            Text(account?.handle ?? '—', style: fz.h(22)),
-            const SizedBox(height: 26),
+            FzPanel(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  FzAvatar(
+                    id: account?.handle ?? '',
+                    name: account?.shownName ?? account?.handle ?? '?',
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const FzEyebrow('Sporcle account'),
+                        const SizedBox(height: 2),
+                        Text(
+                          account?.handle ?? '—',
+                          style: fz.h(16, weight: FontWeight.w700),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
             const DisplayNameField(),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('In a game'),
-            const SizedBox(height: 4),
-            const GameFeedbackSwitches(),
-            const SizedBox(height: 26),
-            const FzEyebrow('This app'),
             const SizedBox(height: 8),
+            const GameFeedbackSwitches(),
+            if (seat != null) ...[
+              const SizedBox(height: 14),
+              FzPanel.tone(
+                FzColors.ok,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
+                ),
+                child: Row(
+                  children: [
+                    FzBanner.dot(FzColors.ok),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Your seat in ${seat.gameCode} is held.',
+                        style: fz.small(13.5, FzColors.ink),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 20),
+            const FzEyebrow('This app'),
+            const SizedBox(height: 6),
             Text(
               appVersion.isEmpty ? 'Development build' : 'Version $appVersion',
-              style: fz.m(14, color: FzColors.dim),
+              style: fz.small(13.5, FzColors.ink),
             ),
             const SizedBox(height: 8),
             const UpdateBanner(),
             if (kDebugMode) ...[
-              const SizedBox(height: 26),
+              const SizedBox(height: 20),
               const FzEyebrow('Relay (debug builds only)'),
               const SizedBox(height: 8),
               TextField(
@@ -133,16 +168,16 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     .setDebugOverride(value),
               ),
             ],
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('Host tools'),
             const SizedBox(height: 8),
             const _KickBypassField(),
-            const SizedBox(height: 26),
+            const SizedBox(height: 24),
             Text(
               'Trivia Relay is not made by Sporcle. It plays Sporcle Party '
               'games with your own account, through a relay that holds your '
               'seat while your phone is away.',
-              style: fz.m(12, color: FzColors.faint, height: 1.5),
+              style: fz.small(13, FzColors.faint),
             ),
           ],
         ),
@@ -210,10 +245,13 @@ class _KickBypassFieldState extends ConsumerState<_KickBypassField> {
     if (active) {
       return Row(
         children: [
-          const Icon(Icons.check_circle_outline, size: 18, color: FzColors.ac),
+          const Icon(Icons.check, size: 22, color: FzColors.ok),
           const SizedBox(width: 8),
           Expanded(
-            child: Text('Bypass active', style: fz.m(14, color: FzColors.ac)),
+            child: Text(
+              'Bypass active',
+              style: fz.h(15, weight: FontWeight.w600, color: FzColors.ok),
+            ),
           ),
           TextButton(
             onPressed: () =>
@@ -225,40 +263,33 @@ class _KickBypassFieldState extends ConsumerState<_KickBypassField> {
     }
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                key: const Key('kickBypassField'),
-                controller: _controller,
-                obscureText: true,
-                keyboardType: TextInputType.visiblePassword,
-                enabled: !_loading,
-                decoration: const InputDecoration(
-                  hintText: 'One-time bypass code',
-                ),
-                onSubmitted: (_) => _activate(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : TextButton(
-                    onPressed: _activate,
-                    child: const Text('Activate'),
-                  ),
-          ],
+        FzInlineAction(
+          field: TextField(
+            key: const Key('kickBypassField'),
+            controller: _controller,
+            obscureText: true,
+            keyboardType: TextInputType.visiblePassword,
+            enabled: !_loading,
+            decoration: const InputDecoration(hintText: 'One-time bypass code'),
+            onSubmitted: (_) => _activate(),
+          ),
+          action: FzButton(
+            label: 'Activate',
+            kind: FzButtonKind.outline,
+            expand: false,
+            height: 56,
+            fontSize: 16,
+            radius: 16,
+            busy: _loading,
+            onPressed: _activate,
+          ),
         ),
         if (_error != null)
           Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text(_error!, style: fz.m(11, color: FzColors.ac2)),
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(_error!, style: fz.small(13.5, FzColors.ac2)),
           ),
       ],
     );

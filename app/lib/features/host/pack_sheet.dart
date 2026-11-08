@@ -137,14 +137,13 @@ class _PackSheetState extends ConsumerState<PackSheet> {
     final bookmarked = pack.bookmarked ?? false;
     return SingleChildScrollView(
       key: const Key('packSheet'),
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              PackImage(url: pack.imageUrl, size: 72),
+              PackImage(url: pack.imageUrl, size: 88),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -156,10 +155,10 @@ class _PackSheetState extends ConsumerState<PackSheet> {
                         pack.name.trim(),
                         maxLines: 3,
                         overflow: TextOverflow.ellipsis,
-                        style: fz.h(20),
+                        style: fz.heading(),
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 8),
                     FzTag(packFacts(pack)),
                   ],
                 ),
@@ -170,28 +169,25 @@ class _PackSheetState extends ConsumerState<PackSheet> {
             const SizedBox(height: 12),
             FzDirection(
               text: description,
-              child: Text(
-                description,
-                style: fz.m(13, color: FzColors.dim, height: 1.5),
-              ),
+              child: Text(description, style: fz.body(15)),
             ),
           ],
           if (widget.chooseLabel != null) ...[
-            const SizedBox(height: 18),
+            const SizedBox(height: 16),
             FzButton(
               key: const Key('choosePackSheetButton'),
               label: widget.chooseLabel!,
               onPressed: () => Navigator.of(context).pop(true),
             ),
           ],
-          const SizedBox(height: 11),
+          const SizedBox(height: 12),
           FzButton(
             key: const Key('bookmarkPackButton'),
             label: bookmarked ? 'Bookmarked' : 'Bookmark',
             trailing: bookmarked ? 'tap to remove' : null,
             kind: FzButtonKind.outline,
-            height: 48,
-            fontSize: 15,
+            height: 52,
+            fontSize: 16,
             busy: _bookmarking || !_loaded,
             onPressed: _loaded ? _bookmark : null,
           ),
@@ -204,17 +200,16 @@ class _PackSheetState extends ConsumerState<PackSheet> {
               onChanged: _loaded && !_subscribing ? _subscribe : null,
               title: Text(
                 'Tell me when someone hosts it',
-                style: fz.m(14, weight: FontWeight.w600),
+                style: fz.h(15, weight: FontWeight.w700),
               ),
               subtitle: Text(
                 "Sporcle Party's own app sends the notice, if you have it.",
-                style: fz.m(12, color: FzColors.dim, height: 1.4),
+                style: fz.small(),
               ),
             ),
           ),
           const SizedBox(height: 4),
-          Align(
-            alignment: AlignmentDirectional.centerStart,
+          Center(
             child: TextButton.icon(
               key: const Key('reportPackButton'),
               style: TextButton.styleFrom(foregroundColor: FzColors.ac2),
@@ -303,49 +298,46 @@ class _ReportPackScreenState extends ConsumerState<ReportPackScreen> {
     final fz = FzTheme.of(context);
     return Scaffold(
       body: FzPage(
-        header: Row(
-          children: [
-            FzCircleButton(
-              icon: Icons.arrow_back,
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: FzEyebrow('Report a pack')),
-          ],
-        ),
+        header: const FzHeaderRow(title: 'Report a pack', eyebrow: true),
         footer: FzButton(
           key: const Key('sendReportButton'),
           label: _sending ? 'Sending…' : 'Send report',
-          kind: FzButtonKind.pink,
           busy: _sending,
           onPressed: _ready ? _send : null,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 12),
-            FzDirection(
-              text: widget.pack.name,
-              child: Text(widget.pack.name.trim(), style: fz.h(20)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                PackImage(url: widget.pack.imageUrl),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FzDirection(
+                    text: widget.pack.name,
+                    child: Text(widget.pack.name.trim(), style: fz.heading()),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             const FzEyebrow("What's wrong with it"),
             const SizedBox(height: 8),
             Wrap(
-              spacing: 6,
-              runSpacing: 6,
+              spacing: 8,
+              runSpacing: 8,
               children: [
                 for (final reason in ReportReason.values)
-                  ChoiceChip(
+                  fzChoiceChip(
                     key: Key('reportReason-${reason.name}'),
-                    label: Text(reasonLabel(reason), style: fz.m(13)),
+                    label: reasonLabel(reason),
                     selected: reason == _reason,
                     onSelected: (_) => setState(() => _reason = reason),
                   ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             const FzEyebrow('Tell Sporcle more'),
             const SizedBox(height: 8),
             TextField(

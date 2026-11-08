@@ -34,7 +34,7 @@ class FinalVoteView extends ConsumerWidget {
     // The vote cast is shown chosen, with a check, not greyed out like the
     // two left behind.
     Widget choice(String value) => Padding(
-      padding: const EdgeInsets.only(bottom: 11),
+      padding: const EdgeInsets.only(bottom: 10),
       child: FzButton(
         key: Key('vote-$value'),
         label: _label(value),
@@ -73,9 +73,11 @@ class FinalVoteView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
-          Text('Final round', style: fz.t(40)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
+          Text('Final round', style: fz.display(36)),
+          const SizedBox(height: 12),
+          const FzAccentBars(flare: true),
+          const SizedBox(height: 12),
           Text(
             spectating
                 ? 'One last question, and the players wager 0, 10 or 20 on '
@@ -84,7 +86,7 @@ class FinalVoteView extends ConsumerWidget {
                 : 'One last question, and you wager 0, 10 or 20 on it. A '
                       'wrong answer costs what you wagered. First: how hard '
                       'should it be?',
-            style: fz.m(15, color: FzColors.dim, height: 1.55),
+            style: fz.body(),
           ),
           const SizedBox(height: 16),
           Countdown(
@@ -92,14 +94,17 @@ class FinalVoteView extends ConsumerWidget {
             pausedRemainingMs: null,
             timeLimitMs: 15000,
           ),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           for (final value in FinalRound.voteChoices) choice(value),
-          const SizedBox(height: 14),
+          const SizedBox(height: 10),
           const FzEyebrow('Standings'),
-          const SizedBox(height: 6),
-          Standings(
-            state: state,
-            onTap: (p) => managePlayer(context, ref, state, p),
+          const SizedBox(height: 8),
+          FzPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Standings(
+              state: state,
+              onTap: (p) => managePlayer(context, ref, state, p),
+            ),
           ),
         ],
       ),
@@ -146,9 +151,11 @@ class FinalWagerView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
-          Text(spectating ? 'The wagers' : 'Your wager', style: fz.t(40)),
-          const SizedBox(height: 10),
+          const SizedBox(height: 4),
+          Text(spectating ? 'The wagers' : 'Your wager', style: fz.display(36)),
+          const SizedBox(height: 12),
+          const FzAccentBars(flare: true),
+          const SizedBox(height: 12),
           Text(
             spectating
                 ? 'The players wager on the final question'
@@ -158,7 +165,7 @@ class FinalWagerView extends ConsumerWidget {
                 ? 'Right adds it, wrong takes it away.'
                 : 'The final question is $picked. Right adds your wager, '
                       'wrong takes it away.',
-            style: fz.m(15, color: FzColors.dim, height: 1.55),
+            style: fz.body(),
           ),
           const SizedBox(height: 16),
           Countdown(
@@ -166,15 +173,20 @@ class FinalWagerView extends ConsumerWidget {
             pausedRemainingMs: null,
             timeLimitMs: 30000,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
           Row(
             children: [
               for (final (i, amount) in state.you.wagerChoices.indexed) ...[
-                if (i > 0) const SizedBox(width: 8),
+                if (i > 0) const SizedBox(width: 10),
                 Expanded(
                   child: _WagerTile(
                     key: Key('finalWager-$amount'),
                     amount: amount,
+                    caption: i == 0
+                        ? 'safe'
+                        : i == state.you.wagerChoices.length - 1
+                        ? 'bold'
+                        : 'steady',
                     chosen: mine == amount || sending == amount,
                     onPressed:
                         mine == null && sending == null && canAct && !spectating
@@ -191,26 +203,38 @@ class FinalWagerView extends ConsumerWidget {
               ],
             ],
           ),
-          const SizedBox(height: 26),
+          const SizedBox(height: 20),
           const FzEyebrow('Standings'),
-          const SizedBox(height: 4),
-          for (final (rank, player) in state.standings.indexed)
-            PlayerRow(
-              player: player,
-              you: player.peerId == state.you.peerId,
-              note: player.finalWagered ? 'wagered' : null,
-              onTap: managePlayer(context, ref, state, player),
-              tapHint: playerMenuHint,
-              trailing: player.spectating
-                  ? null
-                  : Text(
-                      '${player.score}',
-                      style: fz.m(
-                        20,
-                        color: rank == 0 ? FzColors.ac : FzColors.ink,
-                      ),
-                    ),
+          const SizedBox(height: 8),
+          FzPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Column(
+              children: [
+                for (final (rank, player) in state.standings.indexed)
+                  PlayerRow(
+                    player: player,
+                    you: player.peerId == state.you.peerId,
+                    rank: player.spectating ? null : rank + 1,
+                    tag: player.spectating
+                        ? null
+                        : player.finalWagered
+                        ? const FzTag('wagered', color: FzColors.ok)
+                        : const FzTag('choosing'),
+                    onTap: managePlayer(context, ref, state, player),
+                    tapHint: playerMenuHint,
+                    trailing: player.spectating
+                        ? null
+                        : Text(
+                            '${player.score}',
+                            style: fz.numeral(
+                              20,
+                              rank == 0 ? FzColors.ac : FzColors.ink,
+                            ),
+                          ),
+                  ),
+              ],
             ),
+          ),
         ],
       ),
     );
@@ -265,12 +289,9 @@ class FinalScoresView extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 22),
-          if (winners.isNotEmpty)
-            Center(child: _Winners(winners: winners.take(3).toList())),
-          const SizedBox(height: 14),
-          const Center(child: FzEyebrow('Final scores')),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
+          const Center(child: FzEyebrow('Final scores', color: FzColors.ac)),
+          const SizedBox(height: 10),
           Text(
             winners.isEmpty
                 ? 'Game over'
@@ -279,14 +300,20 @@ class FinalScoresView extends ConsumerWidget {
                 : '${winners.map((p) => p.name).join(' & ')} tie',
             key: const Key('winner'),
             textAlign: TextAlign.center,
-            style: fz.t(48, color: FzColors.ac),
+            style: fz.display(36),
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
           const Center(child: FzAccentBars()),
-          const SizedBox(height: 30),
-          Standings(
-            state: state,
-            onTap: (p) => managePlayer(context, ref, state, p),
+          const SizedBox(height: 40),
+          if (winners.isNotEmpty)
+            Center(child: _Winners(winners: winners.take(3).toList())),
+          const SizedBox(height: 40),
+          FzPanel(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Standings(
+              state: state,
+              onTap: (p) => managePlayer(context, ref, state, p),
+            ),
           ),
         ],
       ),
@@ -316,11 +343,15 @@ class _WagerTile extends StatelessWidget {
   const _WagerTile({
     super.key,
     required this.amount,
+    required this.caption,
     required this.chosen,
     required this.onPressed,
   });
 
   final int amount;
+
+  /// What the amount means (safe, bold), or "chosen" once it is.
+  final String caption;
   final bool chosen;
   final VoidCallback? onPressed;
 
@@ -331,30 +362,53 @@ class _WagerTile extends StatelessWidget {
       onPressed: onPressed,
       style:
           OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(88),
-            padding: EdgeInsets.zero,
+            minimumSize: const Size.fromHeight(120),
+            padding: const EdgeInsets.all(12),
             backgroundColor: chosen
-                ? FzColors.ac2.withValues(alpha: .14)
-                : Colors.transparent,
+                ? FzColors.washOf(FzColors.ac2)
+                : FzColors.wash,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
           ).copyWith(
             side: fzFocusRing(
               otherwise: BorderSide(
-                color: chosen ? FzColors.ac2 : FzColors.edge,
-                width: 1.5,
+                color: chosen ? FzColors.edgeOf(FzColors.ac2) : FzColors.line,
               ),
             ),
           ),
-      child: Text(
-        '$amount',
-        style: fz.m(
-          34,
-          weight: FontWeight.w400,
-          // Once one is chosen the others fade; the chosen one stays bright.
-          color: onPressed == null && !chosen ? FzColors.faint : FzColors.ink,
-        ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$amount',
+            style: fz.numeral(
+              48,
+              // Once one is chosen the others fade; the chosen one is Flare.
+              chosen
+                  ? FzColors.ac2
+                  : onPressed == null
+                  ? FzColors.faint
+                  : FzColors.ink,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (chosen) ...[
+                const Icon(Icons.check, size: 14, color: FzColors.ac2),
+                const SizedBox(width: 4),
+              ],
+              Flexible(
+                child: FzEyebrow(
+                  chosen ? 'chosen' : caption,
+                  color: chosen ? FzColors.ac2 : FzColors.dim,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
     return Semantics(selected: chosen, child: button);
@@ -369,9 +423,9 @@ class _Winners extends StatelessWidget {
   final List<PlayerView> winners;
 
   static const _rings = FzRings(
-    color: Color(0x1AFFD23F),
-    first: 70,
-    step: 60,
+    color: Color(0x38FFD23F),
+    first: 62,
+    step: 63,
     count: 6,
   );
 
@@ -409,7 +463,7 @@ class _Winners extends StatelessWidget {
                   padding: const EdgeInsets.all(6),
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
-                    color: FzColors.bgDeep,
+                    color: FzColors.bg,
                   ),
                   child: FzAvatar(
                     id: '${player.peerId}',

@@ -32,59 +32,66 @@ class PackVotesPanel extends ConsumerWidget {
 
     if (host && votes.isEmpty) return const SizedBox.shrink();
 
-    return Column(
+    return Padding(
       key: const Key('packVotes'),
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        const SizedBox(height: 22),
-        FzEyebrow(
-          votes.isEmpty ? 'Pack votes' : 'Pack votes · ${votes.length}',
-        ),
-        const SizedBox(height: 4),
-        Text(
-          host
-              ? 'Tap a pack to play it instead.'
-              : 'Vote for up to ${GameRules.maxPackVotes} packs you’d rather '
-                    'play; the host sees them. Tap one to take your vote back.',
-          style: fz.m(12, color: FzColors.dim, height: 1.4),
-        ),
-        const SizedBox(height: 8),
-        for (final vote in votes)
-          Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: _VoteTile(
-              vote: vote,
-              current: vote.pack.id == state.pack?.id,
-              busy: pending.containsKey('packVote:${vote.pack.id}'),
-              hint: host
-                  ? 'play this pack'
-                  : vote.you
-                  ? 'take your vote back'
-                  : 'vote for it',
-              onTap: !canAct || (!host && !vote.you && left <= 0)
-                  ? null
-                  : host
-                  ? () => _play(context, ref, vote.pack)
-                  : () => act(
-                      context,
-                      ref,
-                      (c) => c.packVote(vote.pack.id, vote: !vote.you),
-                      pending: 'packVote:${vote.pack.id}',
-                    ),
+      padding: const EdgeInsets.only(top: 18),
+      child: FzPanel(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            FzEyebrow(
+              votes.isEmpty ? 'Pack votes' : 'Pack votes · ${votes.length}',
             ),
-          ),
-        if (!host)
-          FzButton(
-            key: const Key('votePackButton'),
-            label: 'Vote for a pack',
-            trailing: '$left of ${GameRules.maxPackVotes} left',
-            kind: FzButtonKind.outline,
-            height: 48,
-            fontSize: 15,
-            busy: pending.containsKey('packVote'),
-            onPressed: canAct && left > 0 ? () => _pick(context, ref) : null,
-          ),
-      ],
+            const SizedBox(height: 4),
+            Text(
+              host
+                  ? 'Tap a pack to play it instead.'
+                  : 'Vote for up to ${GameRules.maxPackVotes} packs you’d rather '
+                        'play; the host sees them. Tap one to take your vote back.',
+              style: fz.small(),
+            ),
+            const SizedBox(height: 10),
+            for (final vote in votes)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: _VoteTile(
+                  vote: vote,
+                  current: vote.pack.id == state.pack?.id,
+                  busy: pending.containsKey('packVote:${vote.pack.id}'),
+                  hint: host
+                      ? 'play this pack'
+                      : vote.you
+                      ? 'take your vote back'
+                      : 'vote for it',
+                  onTap: !canAct || (!host && !vote.you && left <= 0)
+                      ? null
+                      : host
+                      ? () => _play(context, ref, vote.pack)
+                      : () => act(
+                          context,
+                          ref,
+                          (c) => c.packVote(vote.pack.id, vote: !vote.you),
+                          pending: 'packVote:${vote.pack.id}',
+                        ),
+                ),
+              ),
+            if (!host)
+              FzButton(
+                key: const Key('votePackButton'),
+                label: 'Vote for a pack',
+                trailing: '$left of ${GameRules.maxPackVotes} left',
+                kind: FzButtonKind.outline,
+                height: 48,
+                fontSize: 16,
+                radius: 14,
+                busy: pending.containsKey('packVote'),
+                onPressed: canAct && left > 0
+                    ? () => _pick(context, ref)
+                    : null,
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -166,56 +173,53 @@ class _VoteTile extends StatelessWidget {
       child: FzTile(
         onTap: busy ? null : onTap,
         radius: 14,
-        child: FzPanel(
-          borderColor: vote.you ? FzColors.ac : FzColors.edge,
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              PackImage(url: pack.imageUrl, size: 44),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    FzDirection(
-                      text: pack.name,
-                      child: Text(
-                        pack.name.trim(),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: fz.h(15, weight: FontWeight.w700),
-                      ),
+        framed: true,
+        accent: vote.you ? FzColors.ac : null,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            PackImage(url: pack.imageUrl, size: 40),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  FzDirection(
+                    text: pack.name,
+                    child: Text(
+                      pack.name.trim(),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: fz.h(16, weight: FontWeight.w600, height: 1.2),
                     ),
-                    const SizedBox(height: 4),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 4,
-                      children: [
-                        FzTag(
-                          '${vote.votes} vote${vote.votes == 1 ? '' : 's'}',
-                          color: FzColors.ac,
-                        ),
-                        if (vote.you) const FzTag('your vote'),
-                        if (current) const FzTag('playing now'),
-                      ],
-                    ),
-                  ],
+                  ),
+                  const SizedBox(height: 4),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    children: [
+                      if (vote.you)
+                        const FzTag('your vote', color: FzColors.ac),
+                      if (current) const FzTag('playing now'),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (busy)
+              const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Semantics(
+                label: '${vote.votes} vote${vote.votes == 1 ? '' : 's'}',
+                child: ExcludeSemantics(
+                  child: Text('${vote.votes}', style: fz.numeral(20)),
                 ),
               ),
-              const SizedBox(width: 8),
-              if (busy)
-                const SizedBox.square(
-                  dimension: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              else
-                Icon(
-                  vote.you ? Icons.how_to_vote : Icons.how_to_vote_outlined,
-                  color: vote.you ? FzColors.ac : FzColors.dim,
-                  size: 20,
-                ),
-            ],
-          ),
+          ],
         ),
       ),
     );

@@ -92,7 +92,7 @@ class _ToastState extends State<_Toast> {
         child: Align(
           alignment: Alignment.topCenter,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 480),
               child: AnimatedOpacity(
@@ -100,17 +100,28 @@ class _ToastState extends State<_Toast> {
                 duration: quick,
                 child: Semantics(
                   liveRegion: true,
-                  child: Material(
-                    color: FzColors.bgGlow,
-                    elevation: 6,
-                    shadowColor: Colors.black,
-                    borderRadius: BorderRadius.circular(14),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 14,
-                      ),
-                      child: Text(widget.message, style: fz.m(13, height: 1.4)),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: FzColors.lift,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: FzColors.hairline),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x66000000),
+                          blurRadius: 30,
+                          offset: Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      widget.message,
+                      textAlign: TextAlign.center,
+                      style: fz.h(15, weight: FontWeight.w600, height: 1.35),
                     ),
                   ),
                 ),

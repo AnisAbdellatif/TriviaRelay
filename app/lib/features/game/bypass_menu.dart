@@ -5,6 +5,7 @@ import '../../core/models/models.dart';
 import '../../core/providers/connection_providers.dart';
 import '../../core/providers/settings_providers.dart';
 import '../../shared/theme/fz_theme.dart';
+import '../../shared/widgets/fz.dart';
 import '../../shared/widgets/fz_direction.dart';
 import 'game_screen.dart';
 
@@ -26,11 +27,13 @@ class BypassFab extends ConsumerWidget {
     if (token == null) return const SizedBox.shrink();
     if (!ref.watch(seatInteractiveProvider)) return const SizedBox.shrink();
 
-    return FloatingActionButton.small(
+    return FloatingActionButton(
       key: const Key('bypassFab'),
       tooltip: 'Bypass menu',
       backgroundColor: FzColors.ac2,
-      foregroundColor: FzColors.ink,
+      foregroundColor: FzColors.bg,
+      elevation: 0,
+      shape: const CircleBorder(),
       onPressed: () => _showBypassSheet(context, ref, state, token),
       child: const Icon(Icons.admin_panel_settings_outlined),
     );
@@ -129,7 +132,6 @@ class _BypassSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
     final others = [
       for (final p in state.players)
         if (p.peerId != state.you.peerId) p,
@@ -141,34 +143,24 @@ class _BypassSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
-              child: Text('Bypass actions', style: fz.h(18)),
-            ),
+            const FzSheetHeading('Bypass actions', color: FzColors.ac2),
             if (!state.you.host)
-              ListTile(
+              FzMenuRow(
                 key: const Key('bypassBecomeHost'),
-                leading: const Icon(Icons.star_outline),
-                title: Text('Become host', style: fz.h(16)),
-                subtitle: Text(
-                  'Take over the game',
-                  style: fz.m(12, color: FzColors.dim),
-                ),
+                icon: Icons.star_outline,
+                label: const Text('Become host'),
+                detail: 'Take over the game',
                 onTap: () =>
                     Navigator.of(context).pop(_BypassAction.becomeHost),
               ),
-            ListTile(
+            FzMenuRow(
               key: const Key('bypassKickPlayer'),
-              leading: const Icon(Icons.block, color: FzColors.ac2),
-              title: Text(
-                'Kick a player',
-                style: fz.h(16, color: FzColors.ac2),
-              ),
-              subtitle: Text(
-                others.isEmpty ? 'No other players' : 'Pick a player to remove',
-                style: fz.m(12, color: FzColors.dim),
-              ),
-              enabled: others.isNotEmpty,
+              icon: Icons.block,
+              color: FzColors.ac2,
+              label: const Text('Kick a player'),
+              detail: others.isEmpty
+                  ? 'No other players'
+                  : 'Pick a player to remove',
               onTap: others.isEmpty
                   ? null
                   : () => Navigator.of(context).pop(_BypassAction.kickPlayer),
@@ -199,31 +191,33 @@ class _KickPicker extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(22, 0, 22, 8),
-              child: Text('Kick who?', style: fz.h(18)),
-            ),
+            const FzSheetHeading('Kick who?'),
             for (final player in others)
               ListTile(
                 key: Key('kickTarget-${player.peerId}'),
-                leading: Icon(
-                  player.connected
-                      ? Icons.person_outline
-                      : Icons.person_off_outlined,
-                  color: player.connected ? FzColors.ink : FzColors.dim,
+                minTileHeight: 56,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+                leading: FzAvatar(
+                  id: '${player.peerId}',
+                  name: player.name,
+                  away: !player.connected,
                 ),
                 title: FzDirection(
                   text: player.name,
                   child: Text(
                     player.name.trim(),
-                    style: fz.h(16),
+                    style: fz.h(
+                      16,
+                      weight: FontWeight.w600,
+                      color: player.connected ? FzColors.ink : FzColors.dim,
+                    ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 subtitle: Text(
                   player.connected ? 'Connected' : 'Away',
-                  style: fz.m(12, color: FzColors.dim),
+                  style: fz.small(),
                 ),
                 onTap: () => Navigator.of(context).pop(player),
               ),

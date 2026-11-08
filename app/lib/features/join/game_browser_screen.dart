@@ -164,16 +164,10 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 8),
-                    child: Row(
-                      children: [
-                        FzCircleButton(
-                          icon: Icons.arrow_back,
-                          tooltip: 'Back',
-                          onPressed: () => Navigator.of(context).pop(),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text('Find a game', style: fz.t(28))),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+                    child: FzHeaderRow(
+                      title: 'Find a game',
+                      actions: [
                         FzCircleButton(
                           key: const Key('refreshGamesButton'),
                           icon: Icons.refresh,
@@ -184,7 +178,7 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
                     ),
                   ),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 6, 22, 4),
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 4),
                     child: TextField(
                       key: const Key('gameSearchField'),
                       controller: _query,
@@ -220,12 +214,12 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
                         child: ListView(
                           key: const Key('gameList'),
                           physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.fromLTRB(22, 6, 22, 22),
+                          padding: const EdgeInsets.fromLTRB(20, 10, 20, 22),
                           children: [
                             // Only where it matters: a game here has pictures.
                             if (all?.any((game) => game.hasImages) ?? false)
                               const Padding(
-                                padding: EdgeInsets.only(top: 6),
+                                padding: EdgeInsets.only(bottom: 4),
                                 child: PoppersPanel(),
                               ),
                             if (games != null)
@@ -254,7 +248,7 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
     if (listed.isEmpty) return const [];
     return [
       Padding(
-        padding: const EdgeInsets.only(top: 12, bottom: 10),
+        padding: const EdgeInsets.only(top: 14, bottom: 8),
         child: FzEyebrow(_label(list)),
       ),
       for (final game in listed)
@@ -269,53 +263,52 @@ class _GameBrowserScreenState extends ConsumerState<GameBrowserScreen> {
   Widget _footer(FzTheme fz, List<JoinableGame>? games, String search) {
     final Widget child;
     if (_error != null) {
-      child = Column(
-        children: [
-          Text(
-            games == null
-                ? "Couldn't load games."
-                : "Couldn't refresh the games.",
-            style: fz.m(13, color: FzColors.dim),
-          ),
-          const SizedBox(height: 10),
-          FzButton(
-            key: const Key('retryGamesButton'),
-            label: 'Try again',
-            kind: FzButtonKind.outline,
-            height: 44,
-            onPressed: _loading ? null : _load,
-          ),
-        ],
+      child = FzNotice(
+        icon: Icons.cloud_off_outlined,
+        title: games == null
+            ? "Couldn't load games."
+            : "Couldn't refresh the games.",
+        detail: 'Your seat and your place are fine.',
+        action: FzButton(
+          key: const Key('retryGamesButton'),
+          label: 'Try again',
+          kind: FzButtonKind.outline,
+          expand: false,
+          height: 48,
+          fontSize: 16,
+          radius: 14,
+          onPressed: _loading ? null : _load,
+        ),
       );
     } else if (games == null) {
-      child = const SizedBox.square(
-        dimension: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
+      child = const FzSkeletonRows();
     } else if (games.isEmpty && search.isNotEmpty) {
-      child = Text(
-        'No games match "$search".',
+      child = FzNotice(
         key: const Key('noGames'),
-        textAlign: TextAlign.center,
-        style: fz.m(13, color: FzColors.dim, height: 1.5),
+        icon: Icons.search_off,
+        title: 'No games match "$search".',
+        detail: 'Try a pack name, a host or a game code.',
       );
     } else if (games.isEmpty) {
-      child = Text(
-        'No games to join right now. Games hosted for anyone, '
-        "your friends' games and games you're invited to show up here.",
-        key: const Key('noGames'),
-        textAlign: TextAlign.center,
-        style: fz.m(13, color: FzColors.dim, height: 1.5),
+      child = const FzNotice(
+        key: Key('noGames'),
+        icon: Icons.inbox_outlined,
+        title: 'No games to join right now',
+        detail:
+            "Games hosted for anyone, your friends' games and games you're "
+            'invited to show up here.',
       );
     } else {
-      child = Text(
-        games.length == 1 ? '1 game' : '${games.length} games',
-        style: fz.m(12, color: FzColors.faint),
+      child = Center(
+        child: Text(
+          games.length == 1 ? '1 game' : '${games.length} games',
+          style: fz.small(),
+        ),
       );
     }
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 18),
-      child: Center(child: child),
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: child,
     );
   }
 
@@ -338,74 +331,68 @@ class GameTile extends StatelessWidget {
     final fz = FzTheme.of(context);
     final name = game.pack?.name.trim() ?? '';
     final host = game.host?.trim() ?? '';
+    final facts = gameFacts(game);
     return FzTile(
       key: Key('game-${game.code}'),
       onTap: onTap,
-      child: FzPanel(
-        borderColor: game.inLobby ? FzColors.edge : null,
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            PackImage(url: game.pack?.imageUrl, size: 56),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  FzDirection(
-                    text: name,
-                    child: Text(
-                      name.isEmpty ? 'Game ${game.code}' : name,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: fz.h(15.5, weight: FontWeight.w700),
-                    ),
+      framed: true,
+      child: Row(
+        children: [
+          PackImage(url: game.pack?.imageUrl, size: 52),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FzDirection(
+                  text: name,
+                  child: Text(
+                    name.isEmpty ? 'Game ${game.code}' : name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: fz.h(16, weight: FontWeight.w700, height: 1.2),
                   ),
-                  if (host.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    // The words are the app's; only the name takes its own
-                    // direction.
-                    Row(
-                      children: [
-                        Text(
-                          'Hosted by ',
-                          style: fz.m(12, color: FzColors.dim),
-                        ),
-                        Flexible(
-                          child: FzDirection(
-                            text: host,
-                            child: Text(
-                              host,
-                              key: const Key('gameHost'),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: fz.m(12, color: FzColors.dim),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                  const SizedBox(height: 5),
+                ),
+                if (host.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  // The words are the app's; only the name takes its own
+                  // direction.
                   Row(
                     children: [
-                      FzTag(
-                        gameStage(game),
-                        color: game.inLobby ? FzColors.ac : FzColors.dim,
+                      Text('Hosted by ', style: fz.small(13)),
+                      Flexible(
+                        child: FzDirection(
+                          text: host,
+                          child: Text(
+                            host,
+                            key: const Key('gameHost'),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: fz.small(13),
+                          ),
+                        ),
                       ),
-                      Expanded(child: FzTag(gameFacts(game))),
                     ],
                   ),
                 ],
-              ),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    FzTag(
+                      gameStage(game),
+                      color: game.inLobby ? FzColors.ac : FzColors.ac2,
+                    ),
+                    if (facts.isNotEmpty) FzTag(facts),
+                  ],
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            Icon(
-              Icons.chevron_right,
-              color: game.inLobby ? FzColors.ac : FzColors.faint,
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(width: 10),
+          const Icon(Icons.chevron_right, color: FzColors.dim),
+        ],
       ),
     );
   }
@@ -445,9 +432,8 @@ String gameStage(JoinableGame game) => switch (game.stage) {
   GameStage.playing => 'Playing',
 };
 
-/// " · 4 players · photos · 1 popper".
+/// "4 players · photos · 1 popper".
 String gameFacts(JoinableGame game) => [
-  '',
   if (game.playerCount != null)
     game.playerCount == 1 ? '1 player' : '${game.playerCount} players',
   if (game.hasImages) 'photos · 1 popper',
@@ -505,30 +491,44 @@ class _PoppersPanelState extends ConsumerState<PoppersPanel> {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final poppers = ref.watch(poppersProvider).value?.poppers;
-    return FzPanel(
+    return FzPanel.tone(
+      FzColors.ac,
       key: const Key('poppersPanel'),
-      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+      child: Row(
         children: [
-          const FzEyebrow('Party Poppers'),
-          const SizedBox(height: 6),
-          Text(
-            poppers == null
-                ? 'A game with pictures costs 1 to join, except for its host.'
-                : 'You have $poppers. A game with pictures costs 1 to join, '
-                      'except for its host.',
-            key: const Key('popperBalance'),
-            style: fz.m(13, color: FzColors.dim, height: 1.45),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                FzEyebrow(
+                  poppers == null
+                      ? 'Party Poppers'
+                      : 'Party Poppers · $poppers',
+                  color: FzColors.ac,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  poppers == null
+                      ? 'A game with pictures costs 1 to join, except for its '
+                            'host.'
+                      : 'You have $poppers. A game with pictures costs 1 to '
+                            'join, except for its host.',
+                  key: const Key('popperBalance'),
+                  style: fz.small(13.5, FzColors.ink),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 10),
+          const SizedBox(width: 10),
           FzButton(
             key: const Key('claimPoppersButton'),
-            label: 'Claim free ones',
-            trailing: 'one every 4 h',
+            label: 'Claim',
             kind: FzButtonKind.outline,
+            expand: false,
             height: 48,
-            fontSize: 15,
+            fontSize: 16,
+            radius: 14,
             busy: _claiming,
             onPressed: _claim,
           ),

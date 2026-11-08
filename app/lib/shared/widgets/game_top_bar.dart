@@ -65,8 +65,8 @@ class GameTopBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final scaler = MediaQuery.textScalerOf(context);
-    final leaveStyle = fz.h(15, weight: FontWeight.w700);
-    final codeStyle = fz.m(10, tracking: .1);
+    final leaveStyle = fz.h(15, weight: FontWeight.w600);
+    final codeStyle = fz.m(10.5, tracking: .08);
 
     double width(String text, TextStyle style) {
       final painter = TextPainter(
@@ -85,7 +85,7 @@ class GameTopBar extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(22, 12, 14, 6),
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
           child: LayoutBuilder(
             builder: (context, constraints) {
               // What is left for the label and the code, beside the buttons.
@@ -113,7 +113,7 @@ class GameTopBar extends StatelessWidget {
               final code = gameCode == null ? null : 'game $gameCode';
               final showCode =
                   code != null &&
-                  room >= full + 12 + width(code.toUpperCase(), codeStyle);
+                  room >= full + 12 + 16 + width(code.toUpperCase(), codeStyle);
               final text = full > room && shortLabel != null
                   ? shortLabel!
                   : label;
@@ -125,17 +125,14 @@ class GameTopBar extends StatelessWidget {
                     tooltip: 'Home. Your seat is held',
                     onPressed: onBack,
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Semantics(
                       header: true,
                       child: FzEyebrow(text, color: color, maxLines: 1),
                     ),
                   ),
-                  if (showCode) ...[
-                    const SizedBox(width: 12),
-                    FzTag(code, color: FzColors.ac),
-                  ],
+                  if (showCode) ...[const SizedBox(width: 12), FzTag(code)],
                   if (chat != null) ...[
                     const SizedBox(width: 4),
                     _ChatButton(unread: chatUnread, onPressed: chat),
@@ -202,17 +199,19 @@ class _ChatButton extends StatelessWidget {
         ),
         if (unread > 0)
           Positioned(
-            top: 2,
-            right: 0,
+            top: -4,
+            right: -4,
             child: IgnorePointer(
               child: ExcludeSemantics(
                 child: Container(
                   key: const Key('chatUnreadBadge'),
-                  constraints: const BoxConstraints(minWidth: 18),
-                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  constraints: const BoxConstraints(minWidth: 19),
+                  height: 19,
+                  alignment: Alignment.center,
+                  padding: const EdgeInsets.symmetric(horizontal: 5),
                   decoration: BoxDecoration(
                     color: FzColors.ac2,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     unread > 99 ? '99+' : '$unread',
@@ -220,7 +219,12 @@ class _ChatButton extends StatelessWidget {
                     // Fixed: a badge that grows with the text would cover the
                     // button; the count is in the tooltip at any size.
                     textScaler: TextScaler.noScaling,
-                    style: fz.m(11, color: FzColors.bgDeep, height: 1.6),
+                    style: fz.h(
+                      11,
+                      weight: FontWeight.w700,
+                      color: FzColors.bg,
+                      height: 1,
+                    ),
                   ),
                 ),
               ),

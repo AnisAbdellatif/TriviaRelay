@@ -78,7 +78,11 @@ void main() {
         );
         expect(find.text('Host'), findsNWidgets(2));
         expect(find.text('مرحبا!'), findsOneWidget);
-        expect(find.text('You'), findsOneWidget);
+        expect(
+          find.text('You'),
+          findsNothing,
+          reason: 'own bubbles go unnamed',
+        );
         expect(find.text('Hi all'), findsOneWidget);
         expect(find.text('Welcome to the game!'), findsOneWidget);
         expect(find.textContaining('is typing…'), findsOneWidget);
@@ -232,7 +236,10 @@ void main() {
         // Once in a while: right after, the honk waits.
         await tapKey(tester, const ValueKey('player-1'));
         final honk = tester.widget<ListTile>(
-          find.byKey(const Key('playerAction-honk')),
+          find.descendant(
+            of: find.byKey(const Key('playerAction-honk')),
+            matching: find.byType(ListTile),
+          ),
         );
         expect(honk.enabled, isFalse);
       },

@@ -28,41 +28,23 @@ class ConnectionBanner extends ConsumerWidget {
       alignment: Alignment.topCenter,
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
-        child: Container(
-          constraints: const BoxConstraints(minHeight: 36),
-          margin: const EdgeInsets.fromLTRB(22, 8, 22, 4),
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: FzColors.ac2.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              FzBlink(
-                period: const Duration(milliseconds: 500),
-                child: Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: FzColors.ac2,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: FzEyebrow(text, color: FzColors.ac2, maxLines: 1),
-              ),
-              if (status == ConnectionStatus.disconnected &&
-                  onReconnect != null)
-                TextButton(
+        child: FzBanner(
+          margin: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+          leading: FzBanner.dot(FzColors.ac2, pulse: true),
+          title: Text(text),
+          trailing:
+              status == ConnectionStatus.disconnected && onReconnect != null
+              ? FzButton(
                   key: const Key('reconnectButton'),
+                  label: 'Reconnect',
                   onPressed: onReconnect,
-                  style: TextButton.styleFrom(foregroundColor: FzColors.ac2),
-                  child: const Text('Reconnect'),
-                ),
-            ],
-          ),
+                  kind: FzButtonKind.outline,
+                  expand: false,
+                  height: 44,
+                  fontSize: 14,
+                  radius: 14,
+                )
+              : null,
         ),
       ),
     );

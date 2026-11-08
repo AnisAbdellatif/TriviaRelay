@@ -104,28 +104,28 @@ class _ReactionToastState extends State<_ReactionToast> {
                   child: Semantics(
                     liveRegion: true,
                     child: Material(
-                      color: FzColors.bgGlow,
+                      color: FzColors.lift,
                       elevation: 6,
                       shadowColor: Colors.black,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(22),
-                        side: const BorderSide(color: FzColors.ac, width: 1.5),
+                        borderRadius: BorderRadius.circular(16),
+                        side: const BorderSide(color: FzColors.hairline),
                       ),
                       child: Padding(
-                        padding: const EdgeInsets.fromLTRB(12, 10, 16, 10),
+                        padding: const EdgeInsets.fromLTRB(14, 10, 16, 10),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Icon(
                               Icons.campaign_outlined,
                               color: FzColors.ac,
-                              size: 20,
+                              size: 22,
                             ),
                             const SizedBox(width: 10),
                             Flexible(
                               child: Text(
                                 widget.message,
-                                style: fz.m(13, height: 1.4),
+                                style: fz.h(15, weight: FontWeight.w600),
                               ),
                             ),
                           ],

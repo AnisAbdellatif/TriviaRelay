@@ -61,7 +61,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
           onPressed: _complete && !_busy ? _signIn : null,
         ),
         child: Padding(
-          padding: const EdgeInsets.only(top: 40),
+          padding: const EdgeInsets.only(top: 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -70,30 +70,25 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 alignment: AlignmentDirectional.centerStart,
                 child: Transform.translate(
                   offset: const Offset(-10, 0),
-                  child: const FzMark(),
+                  child: const FzMark(size: 96),
                 ),
               ),
               const SizedBox(height: 14),
-              Text('Trivia Relay', style: fz.t(44)),
-              const SizedBox(height: 16),
+              Text('Trivia Relay', style: fz.display()),
+              const SizedBox(height: 14),
               const Align(
                 alignment: AlignmentDirectional.centerStart,
                 child: FzAccentBars(),
               ),
-              const SizedBox(height: 18),
+              const SizedBox(height: 14),
               Text(
-                'Sporcle Party games that keep your place '
-                'when your phone drops.',
-                style: fz.m(
-                  15,
-                  weight: FontWeight.w400,
-                  color: FzColors.dim,
-                  height: 1.6,
-                ),
+                'Sporcle Party games that keep your place. Lock your phone, '
+                'lose signal, come back: you’re where you left off.',
+                style: fz.body(),
               ),
-              const SizedBox(height: 36),
-              const FzEyebrow('Your Sporcle account'),
-              const SizedBox(height: 10),
+              const SizedBox(height: 28),
+              const FzEyebrow('Your Sporcle account', color: FzColors.ac),
+              const SizedBox(height: 12),
               TextField(
                 key: const Key('emailField'),
                 controller: _email,
@@ -103,7 +98,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 decoration: const InputDecoration(hintText: 'Email'),
                 onChanged: (_) => setState(() {}),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
               TextField(
                 key: const Key('passwordField'),
                 controller: _password,
@@ -114,7 +109,7 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                 onChanged: (_) => setState(() {}),
                 onSubmitted: (_) => _signIn(),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               Text(
                 kIsWeb
                     ? 'Your password passes through this app’s relay to '
@@ -122,13 +117,13 @@ class _SignInScreenState extends ConsumerState<SignInScreen> {
                           'relay.'
                     : 'Your password goes to Sporcle and nowhere else. The '
                           'app keeps only the sign-in Sporcle gives back.',
-                style: fz.m(12, color: FzColors.faint, height: 1.5),
+                style: fz.small(),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
               Text(
                 'Trivia Relay is not made by Sporcle. It plays Sporcle Party '
                 'games with your own account.',
-                style: fz.m(12, color: FzColors.faint, height: 1.5),
+                style: fz.small(13.5, FzColors.faint),
               ),
             ],
           ),

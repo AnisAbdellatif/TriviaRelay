@@ -41,11 +41,25 @@ class LobbyView extends ConsumerWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (state.you.host) ...[
+            FzButton(
+              key: const Key('startButton'),
+              label: 'Start the game',
+              trailing:
+                  '${state.players.where((p) => p.ready).length}'
+                  ' of ${state.players.length} ready',
+              busy: pending.containsKey('start'),
+              onPressed: canAct ? () => _start(context, ref) : null,
+            ),
+            const SizedBox(height: 10),
+          ],
           FzButton(
             key: const Key('readyButton'),
             label: ready ? "You're ready" : "I'm ready",
             trailing: ready ? 'tap to undo' : null,
-            kind: ready ? FzButtonKind.outline : FzButtonKind.primary,
+            kind: ready || state.you.host
+                ? FzButtonKind.outline
+                : FzButtonKind.primary,
             busy: pending.containsKey('ready'),
             onPressed: canAct
                 ? () => act(
@@ -56,125 +70,134 @@ class LobbyView extends ConsumerWidget {
                   )
                 : null,
           ),
-          if (state.you.host) ...[
-            const SizedBox(height: 11),
-            FzButton(
-              key: const Key('startButton'),
-              label: 'Start the game',
-              trailing:
-                  '${state.players.where((p) => p.ready).length}'
-                  '/${state.players.length} ready',
-              kind: FzButtonKind.pink,
-              busy: pending.containsKey('start'),
-              onPressed: canAct ? () => _start(context, ref) : null,
-            ),
-          ],
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 8),
-          const FzEyebrow('Game code'),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              Flexible(
-                child: FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    state.gameCode,
-                    key: const Key('gameCode'),
-                    style: fz.m(44, color: FzColors.ac, tracking: .12),
-                  ),
+          const SizedBox(height: 4),
+          FzPanel.tone(
+            FzColors.ac,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FzEyebrow('Game code', color: FzColors.ac),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          state.gameCode,
+                          key: const Key('gameCode'),
+                          style: fz.m(44, tracking: .14, height: 1),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FzCircleButton(
+                      key: const Key('copyCodeButton'),
+                      icon: Icons.copy,
+                      tooltip: 'Copy the code',
+                      onPressed: () =>
+                          _copy(context, state.gameCode, 'Code copied.'),
+                    ),
+                    const SizedBox(width: 4),
+                    // A link to the game on the relay (/join/<code>), through the
+                    // share sheet, or the clipboard where there is none.
+                    FzCircleButton(
+                      key: const Key('shareInviteButton'),
+                      icon: Icons.ios_share,
+                      tooltip: 'Share an invite link',
+                      onPressed: () =>
+                          shareInvite(context, ref, state.gameCode),
+                    ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-              FzCircleButton(
-                key: const Key('copyCodeButton'),
-                icon: Icons.copy,
-                tooltip: 'Copy the code',
-                onPressed: () => _copy(context, state.gameCode, 'Code copied.'),
-              ),
-              const SizedBox(width: 4),
-              // A link to the game on the relay (/join/<code>), through the
-              // share sheet, or the clipboard where there is none.
-              FzCircleButton(
-                key: const Key('shareInviteButton'),
-                icon: Icons.ios_share,
-                tooltip: 'Share an invite link',
-                onPressed: () => shareInvite(context, ref, state.gameCode),
-              ),
-            ],
+              ],
+            ),
           ),
           if (pack != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 14),
             FzButton(
               key: const Key('inviteFriendsButton'),
               label: 'Invite friends',
+              icon: Icons.person_add_alt,
               kind: FzButtonKind.outline,
-              height: 48,
-              fontSize: 15,
+              height: 52,
+              fontSize: 16,
               onPressed: () =>
                   InviteFriendsSheet.show(context, packId: pack.id),
             ),
           ],
-          const SizedBox(height: 14),
-          if (pack != null)
+          if (pack != null) ...[
+            const SizedBox(height: 14),
             FzPanel(
-              padding: const EdgeInsets.all(14),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      PackImage(url: pack.imageUrl, size: 56),
+                      PackImage(url: pack.imageUrl, size: 64),
                       const SizedBox(width: 12),
                       Expanded(
-                        child: FzDirection(
-                          text: pack.name,
-                          child: Text(pack.name.trim(), style: fz.h(20)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            FzDirection(
+                              text: pack.name,
+                              child: Text(
+                                pack.name.trim(),
+                                style: fz.heading(),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            FzTag(
+                              '${state.options.questionsPerGame} questions · '
+                              '${state.options.questionSeconds}s each · '
+                              'final round',
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
                   if ((pack.description ?? '').trim().isNotEmpty) ...[
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 10),
                     FzDirection(
                       text: pack.description!,
-                      child: Text(
-                        pack.description!.trim(),
-                        style: fz.m(13, color: FzColors.dim, height: 1.4),
-                      ),
+                      child: Text(pack.description!.trim(), style: fz.small()),
                     ),
                   ],
-                  const SizedBox(height: 10),
-                  FzTag(
-                    '${state.options.questionsPerGame} questions · '
-                    '${state.options.questionSeconds}s each · final round',
-                    color: FzColors.ac,
-                  ),
+                  if (state.you.host) ...[
+                    const SizedBox(height: 12),
+                    FzButton(
+                      key: const Key('changePackButton'),
+                      label: 'Change the pack',
+                      kind: FzButtonKind.outline,
+                      expand: false,
+                      height: 44,
+                      fontSize: 14,
+                      radius: 14,
+                      onPressed: canAct
+                          ? () => _changePack(context, ref)
+                          : null,
+                    ),
+                  ],
                 ],
               ),
             ),
+          ],
           if (state.you.host) ...[
-            const SizedBox(height: 11),
-            FzButton(
-              key: const Key('changePackButton'),
-              label: 'Change the pack',
-              kind: FzButtonKind.outline,
-              height: 48,
-              fontSize: 15,
-              onPressed: canAct ? () => _changePack(context, ref) : null,
-            ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             _HostOptions(state: state),
           ],
           PackVotesPanel(state: state),
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           FzEyebrow('Players · ${state.players.length}'),
-          const SizedBox(height: 6),
+          const SizedBox(height: 4),
           for (final player in state.players)
             PlayerRow(
               key: ValueKey('player-${player.peerId}'),
@@ -184,15 +207,15 @@ class LobbyView extends ConsumerWidget {
               tapHint: playerMenuHint,
               trailing: player.ready
                   ? const Icon(
-                      Icons.check_circle,
+                      Icons.check,
                       color: FzColors.ok,
-                      size: 20,
+                      size: 22,
                       semanticLabel: 'Ready',
                     )
                   : const Icon(
-                      Icons.radio_button_unchecked,
+                      Icons.more_horiz,
                       color: FzColors.faint,
-                      size: 20,
+                      size: 22,
                       semanticLabel: 'Not ready',
                     ),
             ),
@@ -267,7 +290,6 @@ class _HostOptions extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final fz = FzTheme.of(context);
     final canAct = ref.watch(seatInteractiveProvider);
     // A change just sent shows at once, ahead of the relay.
     final current =
@@ -293,13 +315,13 @@ class _HostOptions extends ConsumerWidget {
       String Function(int) label,
       HostOptions Function(int) changed,
     ) => Wrap(
-      spacing: 6,
-      runSpacing: 6,
+      spacing: 8,
+      runSpacing: 8,
       children: [
         for (final value in values)
-          ChoiceChip(
+          fzChoiceChip(
             key: Key('$prefix-$value'),
-            label: Text(label(value), style: fz.m(12)),
+            label: label(value),
             selected: value == selected,
             onSelected: canAct ? (_) => change(changed(value)) : null,
           ),
@@ -309,6 +331,8 @@ class _HostOptions extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        const FzEyebrow('Host options'),
+        const SizedBox(height: 8),
         chips(
           'lobbyQuestions',
           HostOptions.questionsPerGameChoices,

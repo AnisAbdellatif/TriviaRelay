@@ -31,10 +31,10 @@ class UpdateBanner extends ConsumerWidget {
     // the words, so large text or a narrow phone never squeezes either.
     return Padding(
       padding: const EdgeInsets.only(bottom: 18),
-      child: FzPanel(
-        color: Colors.transparent,
-        borderColor: FzColors.ac.withValues(alpha: .4),
-        padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+      child: FzPanel.tone(
+        FzColors.ac,
+        radius: 16,
+        padding: const EdgeInsets.fromLTRB(14, 10, 4, 10),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -46,10 +46,10 @@ class UpdateBanner extends ConsumerWidget {
                     size == null ? 'New version' : 'New version · $size',
                     color: FzColors.ac,
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 4),
                   Text(
                     'Trivia Relay ${release.version} is out.',
-                    style: fz.h(14, weight: FontWeight.w500),
+                    style: fz.h(14, weight: FontWeight.w600),
                   ),
                   const SizedBox(height: 10),
                   FzButton(
@@ -57,8 +57,8 @@ class UpdateBanner extends ConsumerWidget {
                     label: 'Get it',
                     expand: false,
                     height: 44,
-                    fontSize: 15,
-                    radius: 12,
+                    fontSize: 16,
+                    radius: 14,
                     onPressed: () => _download(context, ref),
                   ),
                 ],
@@ -69,7 +69,7 @@ class UpdateBanner extends ConsumerWidget {
               tooltip: 'Not now',
               onPressed: () =>
                   ref.read(availableUpdateProvider.notifier).dismiss(),
-              icon: const Icon(Icons.close, size: 18),
+              icon: const Icon(Icons.close, size: 20),
               color: FzColors.dim,
             ),
           ],

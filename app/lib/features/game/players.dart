@@ -20,7 +20,15 @@ class PlayerRow extends StatelessWidget {
     this.highlight,
     this.guess,
     this.merge = false,
+    this.tag,
+    this.rank,
   });
+
+  /// A tag beside the name (a guess the host re-marked, a climb).
+  final Widget? tag;
+
+  /// Its place in the standings, from 1, drawn before the avatar.
+  final int? rank;
 
   final PlayerView player;
   final bool you;
@@ -47,25 +55,32 @@ class PlayerRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final notes = [
-      if (you) 'you',
-      if (player.host) 'host',
       // A host who runs the game without playing.
       if (player.spectating) 'watching',
-      if (!player.connected) 'away',
       // The sounds other players sent them (protocol/PROTOCOL.md §6.7).
       if (player.reactions.total == 1) '1 reaction',
       if (player.reactions.total > 1) '${player.reactions.total} reactions',
       ?note,
     ];
     final guess = this.guess;
-    Widget row = Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+    Widget row = Container(
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: FzColors.line)),
+      ),
       child: Row(
         children: [
+          if (rank != null) ...[
+            SizedBox(
+              width: 22,
+              child: Text('$rank', style: fz.numeral(18, FzColors.dim)),
+            ),
+            const SizedBox(width: 4),
+          ],
           FzAvatar(
             id: '${player.peerId}',
             name: player.name,
-            size: 38,
             away: !player.connected,
           ),
           const SizedBox(width: 12),
@@ -73,30 +88,55 @@ class PlayerRow extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                FzDirection(
-                  text: player.name,
-                  child: Text(
-                    player.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: fz.h(16, weight: FontWeight.w700),
-                  ),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 4,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    FzDirection(
+                      text: player.name,
+                      child: Text(
+                        player.name,
+                        style: fz.h(
+                          16,
+                          weight: FontWeight.w600,
+                          height: 1.25,
+                          color: player.connected ? FzColors.ink : FzColors.dim,
+                        ),
+                      ),
+                    ),
+                    if (you)
+                      const FzTag('You', color: FzColors.ac, filled: true),
+                    if (player.host) const FzTag('Host', color: FzColors.ac),
+                    if (!player.connected)
+                      const FzTag('Away', color: FzColors.ac2),
+                    ?tag,
+                  ],
                 ),
                 if (guess != null)
                   Padding(
-                    padding: const EdgeInsets.only(top: 1, bottom: 1),
+                    padding: const EdgeInsets.only(top: 2, bottom: 1),
                     child: FzDirection(
                       text: guess,
                       child: SizedBox(
                         width: double.infinity,
                         child: Text(
                           guess.trim().isEmpty ? '—' : guess.trim(),
-                          style: fz.h(15, weight: FontWeight.w500, height: 1.3),
+                          style: fz.h(
+                            15,
+                            weight: FontWeight.w400,
+                            height: 1.3,
+                            color: FzColors.dim,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                if (notes.isNotEmpty) FzTag(notes.join(' · ')),
+                if (notes.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: FzTag(notes.join(' · ')),
+                  ),
               ],
             ),
           ),
@@ -105,7 +145,7 @@ class PlayerRow extends StatelessWidget {
       ),
     );
     if (onTap != null) {
-      row = FzTile(onTap: onTap, radius: 14, child: row);
+      row = FzTile(onTap: onTap, radius: 12, child: row);
       if (tapHint != null) row = Semantics(onTapHint: tapHint, child: row);
     }
     if (merge) row = MergeSemantics(child: row);
@@ -114,15 +154,11 @@ class PlayerRow extends StatelessWidget {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Positioned(
-          left: -8,
-          right: -8,
-          top: 0,
-          bottom: 0,
+        Positioned.fill(
           child: DecoratedBox(
             decoration: BoxDecoration(
               color: highlight,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
             ),
           ),
         ),
@@ -156,6 +192,9 @@ class Standings extends StatelessWidget {
   Widget build(BuildContext context) {
     final fz = FzTheme.of(context);
     final standings = state.standings;
+    // Where each stood before this question, to show who climbed.
+    int before(PlayerView p) => p.score - (gains[p.peerId] ?? 0);
+    final previous = [...standings]..sort((a, b) => before(b) - before(a));
     // Overtaking somebody slides the rows to their new places.
     return FzReorder(
       children: [
@@ -164,6 +203,12 @@ class Standings extends StatelessWidget {
             key: ValueKey('standing-${player.peerId}'),
             player: player,
             you: player.peerId == state.you.peerId,
+            rank: player.spectating ? null : rank + 1,
+            tag: switch (previous.indexOf(player) - rank) {
+              final up when up > 0 && gains.isNotEmpty && !player.spectating =>
+                FzTag('up $up', color: FzColors.ok),
+              _ => null,
+            },
             onTap: onTap?.call(player),
             tapHint: onTap?.call(player) == null
                 ? null
@@ -175,11 +220,11 @@ class Standings extends StatelessWidget {
                     children: [
                       if ((gains[player.peerId] ?? 0) != 0)
                         Padding(
-                          padding: const EdgeInsets.only(right: 10),
+                          padding: const EdgeInsetsDirectional.only(end: 8),
                           child: Text(
                             _signed(gains[player.peerId]!),
                             style: fz.m(
-                              13,
+                              12,
                               color: gains[player.peerId]! > 0
                                   ? FzColors.ok
                                   : FzColors.ac2,
@@ -189,9 +234,9 @@ class Standings extends StatelessWidget {
                       FzCountUp(
                         from: player.score - (gains[player.peerId] ?? 0),
                         to: player.score,
-                        style: fz.m(
+                        style: fz.numeral(
                           20,
-                          color: rank == 0 ? FzColors.ac : FzColors.ink,
+                          rank == 0 ? FzColors.ac : FzColors.ink,
                         ),
                       ),
                     ],

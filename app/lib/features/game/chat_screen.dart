@@ -152,7 +152,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(22, 12, 22, 6),
+                    padding: const EdgeInsets.fromLTRB(12, 10, 12, 6),
                     child: Row(
                       children: [
                         FzCircleButton(
@@ -183,7 +183,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                   ),
                   _Typing(names: chat.typing),
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 4, 12, 10),
+                    padding: const EdgeInsets.fromLTRB(20, 6, 20, 20),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -219,7 +219,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                           : FzColors.dim,
                                     ),
                                   ),
-                              style: fz.h(16, weight: FontWeight.w500),
+                              style: fz.h(17, weight: FontWeight.w500),
                               decoration: const InputDecoration(
                                 hintText: 'Say something',
                               ),
@@ -233,15 +233,20 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                         ),
                         const SizedBox(width: 8),
                         Padding(
-                          padding: const EdgeInsets.only(top: 2),
+                          padding: EdgeInsets.zero,
                           child: IconButton.filled(
                             key: const Key('chatSendButton'),
                             tooltip: 'Send',
                             onPressed: canSend ? _send : null,
                             style: IconButton.styleFrom(
                               backgroundColor: FzColors.ac,
-                              foregroundColor: FzColors.bgDeep,
-                              minimumSize: const Size(48, 48),
+                              foregroundColor: FzColors.bg,
+                              disabledBackgroundColor: FzColors.ac.withValues(
+                                alpha: .38,
+                              ),
+                              disabledForegroundColor: FzColors.bg,
+                              fixedSize: const Size.square(56),
+                              minimumSize: const Size.square(56),
                             ),
                             icon: _sending
                                 ? const SizedBox(
@@ -249,10 +254,10 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                                     height: 18,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      color: FzColors.bgDeep,
+                                      color: FzColors.bg,
                                     ),
                                   )
-                                : const Icon(Icons.send),
+                                : const Icon(Icons.send, size: 22),
                           ),
                         ),
                       ],
@@ -286,7 +291,7 @@ class _Messages extends StatelessWidget {
           child: Text(
             chat.loading ? 'Loading…' : 'No messages yet. Say hello!',
             textAlign: TextAlign.center,
-            style: fz.m(13, color: FzColors.dim),
+            style: fz.small(),
           ),
         ),
       );
@@ -295,7 +300,7 @@ class _Messages extends StatelessWidget {
     return ListView.builder(
       key: const Key('chatMessages'),
       reverse: true,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
       itemCount: messages.length + more,
       itemBuilder: (context, i) {
         if (i == messages.length) {
@@ -317,7 +322,7 @@ class _Messages extends StatelessWidget {
         }
         final message = messages[i];
         return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: const EdgeInsets.symmetric(vertical: 6),
           child: message.system
               ? _SystemMessage(message: message)
               : _Bubble(message: message),
@@ -340,6 +345,58 @@ class _Bubble extends StatelessWidget {
     final shown = name.isEmpty ? 'Someone' : name;
     final text = message.text.trim();
     final image = message.imageUrl;
+    final bubble = MergeSemantics(
+      child: Container(
+        key: ValueKey('chatMessage-${message.id}'),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+        decoration: BoxDecoration(
+          color: own
+              ? FzColors.ac.withValues(alpha: .16)
+              : Colors.white.withValues(alpha: .08),
+          border: own
+              ? Border.all(color: FzColors.ac.withValues(alpha: .35))
+              : null,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Your own need no name; it reads as "You" to a screen reader.
+            if (own)
+              Semantics(label: 'You', child: const SizedBox.shrink())
+            else
+              FzDirection(
+                text: shown,
+                child: Text(
+                  shown,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: fz.small(13),
+                ),
+              ),
+            if (text.isNotEmpty) ...[
+              if (!own) const SizedBox(height: 2),
+              FzDirection(
+                text: text,
+                child: Text(
+                  text,
+                  style: fz.h(16, weight: FontWeight.w400, height: 1.4),
+                ),
+              ),
+            ],
+            if (image != null) ...[
+              const SizedBox(height: 6),
+              Semantics(
+                image: true,
+                label: 'A picture',
+                child: QuestionImage(url: image, height: 140),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
     return Align(
       alignment: own ? Alignment.centerRight : Alignment.centerLeft,
       child: FractionallySizedBox(
@@ -347,55 +404,19 @@ class _Bubble extends StatelessWidget {
         alignment: own ? Alignment.centerRight : Alignment.centerLeft,
         child: Align(
           alignment: own ? Alignment.centerRight : Alignment.centerLeft,
-          child: MergeSemantics(
-            child: Container(
-              key: ValueKey('chatMessage-${message.id}'),
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 10),
-              decoration: BoxDecoration(
-                color: own
-                    ? FzColors.ac.withValues(alpha: .12)
-                    : FzColors.panel,
-                border: Border.all(
-                  color: own ? FzColors.ac : FzColors.edge,
-                  width: 1,
+          child: own
+              ? bubble
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    ExcludeSemantics(
+                      child: FzAvatar(id: shown, name: shown, size: 28),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(child: bubble),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  FzDirection(
-                    text: shown,
-                    child: Text(
-                      shown,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: fz.m(12, color: own ? FzColors.ac : FzColors.dim),
-                    ),
-                  ),
-                  if (text.isNotEmpty) ...[
-                    const SizedBox(height: 2),
-                    FzDirection(
-                      text: text,
-                      child: Text(
-                        text,
-                        style: fz.h(16, weight: FontWeight.w500),
-                      ),
-                    ),
-                  ],
-                  if (image != null) ...[
-                    const SizedBox(height: 6),
-                    Semantics(
-                      image: true,
-                      label: 'A picture',
-                      child: QuestionImage(url: image, height: 140),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
         ),
       ),
     );
@@ -410,17 +431,26 @@ class _SystemMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
     final text = message.text.trim();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      child: FzDirection(
-        text: text,
-        child: Text(
-          text,
-          key: ValueKey('chatMessage-${message.id}'),
-          textAlign: TextAlign.center,
-          style: fz.m(12, color: FzColors.dim, height: 1.4),
+      child: Center(
+        child: FzDirection(
+          text: text,
+          // Tag-like, but in its own case: it can be any language.
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: FzColors.hairline),
+            ),
+            child: Text(
+              text,
+              key: ValueKey('chatMessage-${message.id}'),
+              textAlign: TextAlign.center,
+              style: FzTheme.of(context).small(13),
+            ),
+          ),
         ),
       ),
     );
@@ -454,13 +484,13 @@ class _Typing extends StatelessWidget {
     return Semantics(
       liveRegion: text.isNotEmpty,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(22, 0, 22, 2),
+        padding: const EdgeInsets.fromLTRB(20, 0, 20, 2),
         child: Text(
           text,
           key: const Key('chatTyping'),
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: fz.m(12, color: FzColors.dim),
+          style: fz.small(),
         ),
       ),
     );

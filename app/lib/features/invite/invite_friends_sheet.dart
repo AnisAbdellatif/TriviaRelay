@@ -132,26 +132,35 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
     final fz = FzTheme.of(context);
     return ListView(
       controller: widget.scroll,
-      padding: const EdgeInsets.fromLTRB(22, 0, 22, 22),
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 22),
       children: [
-        Text('Invite friends', style: fz.t(26)),
+        Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          spacing: 10,
+          runSpacing: 8,
+          children: [
+            Text('Invite friends', style: fz.heading()),
+            FzButton(
+              key: const Key('inviteAllButton'),
+              label: _invitedAll ? 'All invited' : 'Invite all',
+              kind: FzButtonKind.outline,
+              expand: false,
+              height: 44,
+              fontSize: 14,
+              radius: 14,
+              selected: _invitedAll,
+              busy: _sending.contains('*'),
+              onPressed: _friends.isEmpty ? null : () => _invite(null),
+            ),
+          ],
+        ),
         const SizedBox(height: 8),
         Text(
           'Sporcle tells them, in Sporcle Party, that you are in this game.',
-          style: fz.m(13, color: FzColors.dim, height: 1.5),
+          style: fz.small(),
         ),
-        const SizedBox(height: 14),
-        FzButton(
-          key: const Key('inviteAllButton'),
-          label: _invitedAll ? 'All invited' : 'Invite all',
-          kind: FzButtonKind.outline,
-          height: 48,
-          fontSize: 15,
-          selected: _invitedAll,
-          busy: _sending.contains('*'),
-          onPressed: _friends.isEmpty ? null : () => _invite(null),
-        ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         for (final friend in _friends) _row(fz, friend),
         _footer(fz),
       ],
@@ -159,13 +168,23 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
   }
 
   Widget _row(FzTheme fz, Friend friend) {
+    final large = MediaQuery.textScalerOf(context).scale(10) > 13;
     final invited = _invitedAll || _invited.contains(friend.id);
     final handle = friend.handle;
-    return Padding(
+    return Container(
       key: Key('friend-${friend.id}'),
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      constraints: const BoxConstraints(minHeight: 56),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: FzColors.line)),
+      ),
       child: Row(
         children: [
+          // Room for the name and the button first, at large text.
+          if (!large) ...[
+            FzAvatar(id: friend.id, name: friend.name),
+            const SizedBox(width: 12),
+          ],
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -176,7 +195,7 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
                     friend.name,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: fz.h(16, weight: FontWeight.w700),
+                    style: fz.h(16, weight: FontWeight.w600, height: 1.25),
                   ),
                 ),
                 if (handle != null && handle != friend.name)
@@ -186,7 +205,7 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
                       '@$handle',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: fz.m(12, color: FzColors.dim),
+                      style: fz.small(13),
                     ),
                   ),
               ],
@@ -198,8 +217,9 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
             label: invited ? 'Invited' : 'Invite',
             kind: FzButtonKind.outline,
             expand: false,
-            height: 48,
+            height: 44,
             fontSize: 14,
+            radius: 14,
             selected: invited,
             busy: _sending.contains(friend.id),
             onPressed: () => _invite(friend),
@@ -212,33 +232,40 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
   Widget _footer(FzTheme fz) {
     final Widget child;
     if (_error != null) {
-      child = Column(
-        children: [
-          Text(
-            "Couldn't load your friends.",
-            style: fz.m(13, color: FzColors.dim),
-          ),
-          const SizedBox(height: 10),
-          FzButton(
-            key: const Key('retryFriendsButton'),
-            label: 'Try again',
-            kind: FzButtonKind.outline,
-            height: 48,
-            onPressed: _load,
-          ),
-        ],
+      child = FzPanel.tone(
+        FzColors.ac2,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                "Couldn't load your friends.",
+                style: fz.small(13.5, FzColors.ink),
+              ),
+            ),
+            const SizedBox(width: 10),
+            FzButton(
+              key: const Key('retryFriendsButton'),
+              label: 'Try again',
+              kind: FzButtonKind.outline,
+              expand: false,
+              height: 44,
+              fontSize: 14,
+              radius: 14,
+              onPressed: _load,
+            ),
+          ],
+        ),
       );
     } else if (_loading) {
-      child = const SizedBox.square(
-        dimension: 22,
-        child: CircularProgressIndicator(strokeWidth: 2),
-      );
+      child = const Center(child: FzWaiting('Loading friends'));
     } else if (_nextPage != null) {
       child = FzButton(
         key: const Key('moreFriendsButton'),
         label: 'More friends',
         kind: FzButtonKind.outline,
-        height: 48,
+        height: 52,
+        fontSize: 16,
         onPressed: _load,
       );
     } else if (_friends.isEmpty) {
@@ -246,14 +273,14 @@ class _InviteFriendsState extends ConsumerState<InviteFriendsSheet> {
         'No friends yet. Friends you add in Sporcle Party show up here.',
         key: const Key('noFriends'),
         textAlign: TextAlign.center,
-        style: fz.m(13, color: FzColors.dim, height: 1.5),
+        style: fz.small(),
       );
     } else {
       child = const SizedBox.shrink();
     }
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      child: Center(child: child),
+      child: child,
     );
   }
 }

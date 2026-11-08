@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 
-/// Colour tokens from the Trivia Relay design canvas
-/// (https://claude.ai/artifact/Paezq4BHSeaUd4XLqfiZTt, "Identity").
+/// Colour tokens from the Trivia Relay redesign ("Baton system",
+/// `design/ui-inventory.md` and the Claude Design boards it produced).
 ///
-/// Signal is the first leg of the relay: primary actions, the game code, the
-/// leader. Flare is the second: host actions, the held seat, the final round.
-/// Red is reserved for a clock running out.
+/// What each colour may mean: Signal is your move (the primary action, your
+/// row, what is chosen, the rings). Flare is the stakes (the final round,
+/// wagers, leaving, kicking). OK is confirmed truth only (locked in, right,
+/// ready). Alarm is the clock and nothing else, never an error.
+///
+/// Four surfaces, darkest first: [bgDeep] behind the phone column, [bg] under
+/// every screen, [bgGlow] for sheets and pressed tiles, [lift] for the only
+/// floating layer (dialogs and toasts). Hairlines, not shadows, separate them.
 abstract final class FzColors {
   /// Signal yellow, primary.
   static const ac = Color(0xFFFFD23F);
@@ -21,15 +26,28 @@ abstract final class FzColors {
   /// play. 50% ink, still 3:1 on the page.
   static const faint = Color(0x80F1F0EA);
 
-  /// Navy: the card ground.
+  /// Ground: every screen's background, and the text colour on Signal or
+  /// Flare.
   static const bg = Color(0xFF111729);
 
-  /// Darkest navy, behind everything, and the text colour on Signal or Flare.
+  /// Void: behind the phone column on a wide screen.
   static const bgDeep = Color(0xFF0A0E1A);
 
-  /// Raised navy: placeholders for pictures that haven't come.
+  /// Raised: sheets, pressed tiles, placeholders for pictures that haven't
+  /// come.
   static const bgGlow = Color(0xFF1B2442);
-  static const panel = Color(0x0FF1F0EA);
+
+  /// Lift: dialogs and toasts, the only layer that floats.
+  static const lift = Color(0xFF232C4D);
+
+  /// The faintest wash: a tile at rest.
+  static const wash = Color(0x0AFFFFFF);
+
+  /// A panel's wash.
+  static const panel = Color(0x12FFFFFF);
+
+  /// A stronger wash: an empty switch track, a skeleton row.
+  static const wash3 = Color(0x1FFFFFFF);
 
   /// The mat behind a question's photo. Near-opaque warm white rather than the
   /// translucent [panel]: photos are letterboxed to fit (`BoxFit.contain`), and
@@ -38,31 +56,41 @@ abstract final class FzColors {
   /// mat gives it an edge, the way a print has one.
   static const photoMat = Color(0xF7F1F0EA);
 
-  /// Hairline borders that only decorate: dividers, panels, the drag handle.
-  static const line = Color(0x33F1F0EA);
+  /// Hairline borders that only decorate: dividers between rows, panels,
+  /// tiles. 12% ink.
+  static const line = Color(0x1FF1F0EA);
+
+  /// The stronger hairline: sheets, dialogs, toasts, tags. 24% ink.
+  static const hairline = Color(0x3DF1F0EA);
 
   /// The outline that tells a control apart from the page: fields, chips,
   /// outlined and round buttons. 40% ink, 3:1 on the page (WCAG 1.4.11),
-  /// where [line] is 1.7:1.
+  /// where the design's 24% [hairline] would be 1.9:1.
   static const edge = Color(0x66F1F0EA);
 
-  /// The ring around whatever has keyboard focus: the page's ink, well over
-  /// 3:1 against the page and against Signal and Flare fills.
+  /// The ring around whatever has keyboard focus: ink, not the design's
+  /// Signal, because a Signal ring with no gap merged into a Signal button.
   static const focus = ink;
 
   /// The empty part of a progress bar.
-  static const track = Color(0x1AF1F0EA);
+  static const track = wash3;
   static const ok = Color(0xFF3EE0A1);
 
   /// Red, for a clock that is running out and nothing else: Flare already
   /// means "wrong", and time running out has to read as a louder thing.
   static const alarm = Color(0xFFFF3B30);
 
-  /// The Signal rings in the top corner of every screen.
-  static const arcs = Color(0x12FFD23F);
+  /// The Signal rings in the top corner of every screen, at their brightest
+  /// (they fade out from the corner).
+  static const arcs = Color(0x33FFD23F);
 
   /// The rings of the final round.
-  static const flareArcs = Color(0x17FF4F7B);
+  static const flareArcs = Color(0x42FF4F7B);
+
+  /// An accent's wash and its hairline: a chosen tile, a banner, a re-marked
+  /// guess.
+  static Color washOf(Color accent) => accent.withValues(alpha: .09);
+  static Color edgeOf(Color accent) => accent.withValues(alpha: .48);
 }
 
 typedef FontApplier = TextStyle Function(TextStyle style);
@@ -170,8 +198,8 @@ class FzTheme extends ThemeExtension<FzTheme> {
     double size, {
     FontWeight weight = FontWeight.w800,
     Color color = FzColors.ink,
-    double height = 1.05,
-    double tracking = -.025,
+    double height = 1.0,
+    double tracking = -.02,
   }) => titleFont(
     TextStyle(
       fontSize: size,
@@ -181,6 +209,32 @@ class FzTheme extends ThemeExtension<FzTheme> {
       letterSpacing: size * tracking,
     ),
   );
+
+  /// The type scale. Display: a screen's hero title (Bricolage 40/40).
+  TextStyle display([double size = 40, Color color = FzColors.ink]) =>
+      t(size, color: color);
+
+  /// Title: a phase's or a screen's title (Bricolage 28/31).
+  TextStyle title([double size = 28, Color color = FzColors.ink]) =>
+      t(size, color: color, height: 1.1, tracking: -.015);
+
+  /// Heading: a pack's name, a sheet's title (Figtree 700 20/25).
+  TextStyle heading([double size = 20, Color color = FzColors.ink]) =>
+      h(size, weight: FontWeight.w700, color: color, height: 1.25);
+
+  /// Body: explanations under a title (Figtree 16/23), dim unless told.
+  TextStyle body([double size = 16, Color color = FzColors.dim]) =>
+      h(size, weight: FontWeight.w400, color: color, height: 1.45);
+
+  /// Small: notes under a control (Figtree 13.5/19), dim unless told.
+  TextStyle small([double size = 13.5, Color color = FzColors.dim]) =>
+      h(size, weight: FontWeight.w400, color: color, height: 1.4);
+
+  /// A big number: a score, a wager, the clock (Bricolage 800, even digits).
+  TextStyle numeral(double size, [Color color = FzColors.ink]) => t(
+    size,
+    color: color,
+  ).copyWith(fontFeatures: const [FontFeature.tabularFigures()]);
 
   @override
   FzTheme copyWith({
@@ -202,7 +256,7 @@ class FzTheme extends ThemeExtension<FzTheme> {
 /// the answer) wears a softer Signal from the start ([fzKeyFieldBorder]).
 OutlineInputBorder fzFieldBorder(Color color, {double width = 1.5}) =>
     OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
+      borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide(color: color, width: width),
     );
 
@@ -212,7 +266,7 @@ OutlineInputBorder fzFieldBorder(Color color, {double width = 1.5}) =>
 final fzKeyFieldBorder = fzFieldBorder(FzColors.ac.withValues(alpha: .6));
 
 /// A focused field: full Signal, thick enough to read as a change.
-final fzFocusedFieldBorder = fzFieldBorder(FzColors.ac, width: 3);
+final fzFocusedFieldBorder = fzFieldBorder(FzColors.ac, width: 2);
 
 /// A button's outline while it has keyboard focus: a ring outside its edge,
 /// [FzColors.focus] against the page. [otherwise] is its outline the rest of
@@ -246,30 +300,34 @@ ThemeData buildFzTheme({
     useMaterial3: true,
     colorScheme: const ColorScheme.dark(
       primary: FzColors.ac,
-      onPrimary: FzColors.bgDeep,
+      onPrimary: FzColors.bg,
       secondary: FzColors.ac2,
-      onSecondary: FzColors.bgDeep,
+      onSecondary: FzColors.bg,
       tertiary: FzColors.ok,
-      onTertiary: FzColors.bgDeep,
+      onTertiary: FzColors.bg,
       error: FzColors.ac2,
-      onError: FzColors.bgDeep,
+      onError: FzColors.bg,
       surface: FzColors.bg,
       onSurface: FzColors.ink,
       onSurfaceVariant: FzColors.dim,
       outline: FzColors.edge,
       outlineVariant: FzColors.line,
+      surfaceContainerHigh: FzColors.lift,
+      surfaceContainerLow: FzColors.bgGlow,
     ),
     scaffoldBackgroundColor: FzColors.bgDeep,
     textTheme: applyTextFont == null ? baseText : applyTextFont(baseText),
     extensions: [fz],
     dividerTheme: const DividerThemeData(color: FzColors.line, thickness: 1),
     inputDecorationTheme: InputDecorationTheme(
-      hintStyle: fz.m(15, color: FzColors.faint),
-      labelStyle: fz.m(13, color: FzColors.dim),
-      floatingLabelStyle: fz.m(13, color: FzColors.ac),
-      errorStyle: fz.m(11, color: FzColors.ac2),
-      counterStyle: fz.m(10, color: FzColors.faint),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+      filled: true,
+      fillColor: const Color(0x4D000000),
+      hintStyle: fz.h(17, weight: FontWeight.w500, color: FzColors.faint),
+      labelStyle: fz.small(),
+      floatingLabelStyle: fz.small(13.5, FzColors.ac),
+      errorStyle: fz.small(13.5, FzColors.ac2),
+      counterStyle: fz.m(12, color: FzColors.faint),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 17),
       border: border(FzColors.edge),
       enabledBorder: border(FzColors.edge),
       focusedBorder: fzFocusedFieldBorder,
@@ -291,11 +349,14 @@ ThemeData buildFzTheme({
       valueIndicatorTextStyle: fz.m(14, color: FzColors.bgDeep),
     ),
     switchTheme: SwitchThemeData(
+      // A 52 by 32 track, empty until on, with a round thumb: ink at rest,
+      // Ground on the Signal track.
       thumbColor: WidgetStateProperty.resolveWith(
-        (states) => selected(states) ? FzColors.bgDeep : FzColors.dim,
+        (states) => selected(states) ? FzColors.bg : FzColors.ink,
       ),
+      thumbIcon: const WidgetStatePropertyAll(Icon(null)),
       trackColor: WidgetStateProperty.resolveWith(
-        (states) => selected(states) ? FzColors.ac : FzColors.panel,
+        (states) => selected(states) ? FzColors.ac : FzColors.wash3,
       ),
       trackOutlineColor: WidgetStateProperty.resolveWith(
         (states) => selected(states) ? FzColors.ac : FzColors.edge,
@@ -310,41 +371,51 @@ ThemeData buildFzTheme({
     // Material's, and never wider than the phone column it opens over — on a
     // desktop the default stretched a short form across the whole window.
     dialogTheme: DialogThemeData(
-      backgroundColor: FzColors.bg,
+      backgroundColor: FzColors.lift,
       surfaceTintColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
       constraints: const BoxConstraints(minWidth: 280, maxWidth: 480),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-      titleTextStyle: fz.t(24),
-      contentTextStyle: fz.m(13, color: FzColors.dim, height: 1.5),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(24),
+        side: const BorderSide(color: FzColors.hairline),
+      ),
+      titleTextStyle: fz.heading(),
+      contentTextStyle: fz.body(15),
+      actionsPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
     ),
     // Every choice in the app (wagers, options, pack lists) is a ChoiceChip:
-    // a hairline box that turns Signal when chosen. Each call site sets only
-    // its label.
+    // an outlined box that fills Signal, with a check, when chosen, so the
+    // choice never rests on colour alone. Call sites give a plain label
+    // ([fzChoiceChip]), which also sets the accent.
     chipTheme: ChipThemeData(
-      showCheckmark: false,
+      showCheckmark: true,
+      checkmarkColor: FzColors.bg,
       color: WidgetStateProperty.resolveWith(
-        (states) => selected(states)
-            ? FzColors.ac.withValues(alpha: .24)
-            : Colors.transparent,
+        (states) => selected(states) ? FzColors.ac : Colors.transparent,
       ),
       side: WidgetStateBorderSide.resolveWith(
         (states) => states.contains(WidgetState.focused)
             ? const BorderSide(color: FzColors.focus, width: 2.5)
-            : BorderSide(
-                color: selected(states) ? FzColors.ac : FzColors.edge,
-                width: 1.5,
-              ),
+            : selected(states)
+            ? BorderSide.none
+            : const BorderSide(color: FzColors.edge, width: 1.5),
       ),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 10),
-      labelStyle: fz.m(14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+      labelStyle: fz
+          .h(16, weight: FontWeight.w600)
+          .copyWith(
+            color: WidgetStateColor.resolveWith(
+              (states) => selected(states) ? FzColors.bg : FzColors.ink,
+            ),
+          ),
     ),
     textButtonTheme: TextButtonThemeData(
       style: TextButton.styleFrom(
-        foregroundColor: FzColors.ac,
+        foregroundColor: FzColors.ink,
         disabledForegroundColor: FzColors.faint,
-        textStyle: fz.h(15, weight: FontWeight.w700),
+        textStyle: fz.h(16, weight: FontWeight.w700),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
         minimumSize: const Size(48, 48),
       ).copyWith(side: fzFocusRing()),
     ),
@@ -354,8 +425,8 @@ ThemeData buildFzTheme({
       style: ButtonStyle(side: fzFocusRing()),
     ),
     snackBarTheme: SnackBarThemeData(
-      backgroundColor: FzColors.bgGlow,
-      contentTextStyle: fz.m(13),
+      backgroundColor: FzColors.lift,
+      contentTextStyle: fz.h(15, weight: FontWeight.w600),
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
     ),
@@ -363,12 +434,22 @@ ThemeData buildFzTheme({
       color: FzColors.ac,
     ),
     bottomSheetTheme: const BottomSheetThemeData(
-      backgroundColor: FzColors.bg,
+      backgroundColor: Color(0xFF1A2240),
+      surfaceTintColor: Colors.transparent,
       showDragHandle: true,
-      dragHandleColor: FzColors.line,
+      dragHandleColor: FzColors.hairline,
+      dragHandleSize: Size(40, 5),
+      modalBarrierColor: Color(0x9E05070E),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+        side: BorderSide(color: FzColors.hairline),
       ),
+    ),
+    listTileTheme: ListTileThemeData(
+      iconColor: FzColors.ink,
+      titleTextStyle: fz.h(16, weight: FontWeight.w700),
+      subtitleTextStyle: fz.small(),
+      minVerticalPadding: 10,
     ),
     textSelectionTheme: const TextSelectionThemeData(
       cursorColor: FzColors.ac,

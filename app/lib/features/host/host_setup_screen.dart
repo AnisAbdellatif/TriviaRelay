@@ -54,17 +54,7 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
     final fz = FzTheme.of(context);
     return Scaffold(
       body: FzPage(
-        header: Row(
-          children: [
-            FzCircleButton(
-              icon: Icons.arrow_back,
-              tooltip: 'Back',
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-            const SizedBox(width: 12),
-            const Expanded(child: FzEyebrow('Host a game')),
-          ],
-        ),
+        header: const FzHeaderRow(title: 'Host a game', eyebrow: true),
         footer: FzButton(
           key: const Key('createGameButton'),
           label: _creating
@@ -83,15 +73,20 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 10),
-            Text('Set up tonight’s game', style: fz.t(34)),
-            const SizedBox(height: 26),
+            const SizedBox(height: 6),
+            Text('Set up tonight’s game', style: fz.display(34)),
+            const SizedBox(height: 12),
+            const Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: FzAccentBars(),
+            ),
+            const SizedBox(height: 22),
             const FzEyebrow('Pack'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _PackChoice(pack: _pack, onTap: _choosePack),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('Questions'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _Choices<int>(
               keyPrefix: 'questions',
               values: HostOptions.questionsPerGameChoices,
@@ -101,9 +96,9 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
                 () => _options = _options.copyWith(questionsPerGame: n),
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('Seconds per question'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _Choices<int>(
               keyPrefix: 'seconds',
               values: HostOptions.questionSecondsChoices,
@@ -113,25 +108,39 @@ class _HostSetupScreenState extends ConsumerState<HostSetupScreen> {
                 () => _options = _options.copyWith(questionSeconds: n),
               ),
             ),
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('Who can join'),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _Choices<Audience>(
               keyPrefix: 'audience',
               values: Audience.values,
               selected: _options.audience,
               label: audienceLabel,
+              // Open to anyone is the one with stakes: strangers come.
+              accent: (a) => a == Audience.anyone ? FzColors.ac2 : FzColors.ac,
               onSelected: (a) =>
                   setState(() => _options = _options.copyWith(audience: a)),
             ),
             if (_options.audience == Audience.anyone) ...[
               const SizedBox(height: 8),
-              Text(
-                'Listed publicly: strangers join within seconds.',
-                style: fz.m(12, color: FzColors.ac2),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.warning_amber_rounded,
+                    size: 18,
+                    color: FzColors.ac2,
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Listed publicly: strangers join within seconds.',
+                      style: fz.small(13.5, FzColors.ac2),
+                    ),
+                  ),
+                ],
               ),
             ],
-            const SizedBox(height: 26),
+            const SizedBox(height: 20),
             const FzEyebrow('Host only'),
             const SizedBox(height: 4),
             SpectateSwitch(
@@ -172,41 +181,47 @@ class _PackChoice extends StatelessWidget {
     final fz = FzTheme.of(context);
     final pack = this.pack;
     if (pack != null) {
-      return PackTile(
-        pack: pack,
-        onTap: onTap,
-        trailing: Text('Change', style: fz.m(13, color: FzColors.ac)),
+      return Row(
+        children: [
+          Expanded(
+            child: PackTile(pack: pack, onTap: onTap, selected: true),
+          ),
+          const SizedBox(width: 8),
+          FzButton(
+            label: 'Change',
+            kind: FzButtonKind.outline,
+            expand: false,
+            height: 64,
+            fontSize: 16,
+            radius: 14,
+            onPressed: onTap,
+          ),
+        ],
       );
     }
     return FzTile(
       key: const Key('choosePackButton'),
       onTap: onTap,
-      child: FzPanel(
-        borderColor: FzColors.edge,
-        padding: const EdgeInsets.all(10),
-        child: Row(
-          children: [
-            const PackImage(url: null),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Choose a pack',
-                    style: fz.h(15.5, weight: FontWeight.w700),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    'Browse popular and fresh packs, or search',
-                    style: fz.m(12, color: FzColors.dim),
-                  ),
-                ],
-              ),
+      framed: true,
+      child: Row(
+        children: [
+          const PackImage(url: null),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Choose a pack', style: fz.h(16, weight: FontWeight.w700)),
+                const SizedBox(height: 3),
+                Text(
+                  'Browse popular and fresh packs, or search',
+                  style: fz.small(13),
+                ),
+              ],
             ),
-            const Icon(Icons.chevron_right, color: FzColors.dim),
-          ],
-        ),
+          ),
+          const Icon(Icons.chevron_right, color: FzColors.dim),
+        ],
       ),
     );
   }
@@ -219,8 +234,10 @@ class _Choices<T> extends StatelessWidget {
     required this.selected,
     required this.label,
     required this.onSelected,
+    this.accent,
   });
 
+  final Color Function(T)? accent;
   final String keyPrefix;
   final List<T> values;
   final T selected;
@@ -229,15 +246,15 @@ class _Choices<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fz = FzTheme.of(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,
       children: [
         for (final value in values)
-          ChoiceChip(
+          fzChoiceChip(
             key: Key('$keyPrefix-$value'),
-            label: Text(label(value), style: fz.m(14)),
+            label: label(value),
+            accent: accent?.call(value) ?? FzColors.ac,
             selected: value == selected,
             onSelected: (_) => onSelected(value),
           ),

@@ -22,19 +22,13 @@ class SpectateSwitch extends StatelessWidget {
       value: value,
       onChanged: onChanged,
       contentPadding: EdgeInsets.zero,
-      activeTrackColor: FzColors.ac2,
-      trackOutlineColor: WidgetStateProperty.resolveWith(
-        (states) => states.contains(WidgetState.selected)
-            ? FzColors.ac2
-            : FzColors.edge,
-      ),
       title: Text(
         'Host as a spectator',
-        style: fz.h(15, weight: FontWeight.w700),
+        style: fz.h(16, weight: FontWeight.w700),
       ),
       subtitle: Text(
         'Run the game without playing: you reveal and mark, the others answer.',
-        style: fz.m(12, color: FzColors.dim, height: 1.4),
+        style: fz.small(13),
       ),
     );
   }

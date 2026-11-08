@@ -187,22 +187,23 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
               busy: locking,
               onPressed: canSubmit ? _submit : null,
             ),
+          if (mine != null && !spectating && !state.you.host)
+            const FzButton(
+              key: Key('lockedInButton'),
+              label: 'Locked in',
+              trailing: 'wait for others',
+              selected: true,
+              onPressed: null,
+            ),
           if (state.you.host) ...[
-            if (mine == null && !spectating) const SizedBox(height: 11),
-            if (!state.you.canReveal) ...[
-              Text(
-                'Reveal opens once everyone has answered, or 5 seconds '
-                'after time runs out.',
-                key: const Key('revealHint'),
-                style: fz.m(12, color: FzColors.dim, height: 1.4),
-              ),
-              const SizedBox(height: 8),
-            ],
+            if (mine == null && !spectating) const SizedBox(height: 10),
             FzButton(
               key: const Key('revealButton'),
               label: 'Reveal the answer',
               trailing: '$answered/${playing.length} answered',
-              kind: FzButtonKind.pink,
+              kind: mine == null && !spectating
+                  ? FzButtonKind.outline
+                  : FzButtonKind.primary,
               busy: ref.watch(pendingIntentsProvider).containsKey('reveal'),
               // As in the official app: once everyone has answered, or
               // a few seconds after time runs out (the relay decides).
@@ -211,6 +212,16 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                         act(context, ref, (c) => c.reveal(), pending: 'reveal')
                   : null,
             ),
+            if (!state.you.canReveal) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Reveal opens once everyone has answered, or 5 seconds '
+                'after time runs out.',
+                key: const Key('revealHint'),
+                textAlign: TextAlign.center,
+                style: fz.small(),
+              ),
+            ],
           ],
         ],
       ),
@@ -225,14 +236,14 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                   _final
                       ? 'Final · ${state.finalRound?.picked ?? ''}'
                       : question.category ?? '',
-                  color: _final ? FzColors.ac2 : FzColors.dim,
+                  color: _final ? FzColors.ac2 : FzColors.ac,
                 ),
               ),
               if (question.difficulty != null)
                 FzTag('${question.difficulty}% get it'),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           FzDirection(
             text: question.text,
             child: Text(
@@ -240,7 +251,8 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
               key: const Key('questionText'),
               style: fz.h(
                 _isShort(question.text) ? 64 : 26,
-                height: 1.28,
+                weight: FontWeight.w700,
+                height: 1.2,
                 tracking: -.01,
               ),
             ),
@@ -249,52 +261,47 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
             const SizedBox(height: 14),
             QuestionImage(url: question.imageUrl!),
           ],
-          const SizedBox(height: 22),
+          const SizedBox(height: 18),
           if (spectating)
             FzPanel(
               key: const Key('spectatingPanel'),
-              color: Colors.transparent,
-              borderColor: FzColors.edge,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   const Icon(
                     Icons.visibility_outlined,
                     color: FzColors.dim,
-                    size: 18,
+                    size: 22,
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       'You’re hosting as a spectator: the players answer, '
                       'you reveal.',
-                      style: fz.m(13, color: FzColors.dim, height: 1.4),
+                      style: fz.small(13.5, FzColors.ink),
                     ),
                   ),
                 ],
               ),
             )
           else if (mine != null) ...[
-            FzPanel(
+            FzPanel.tone(
+              FzColors.ok,
               key: const Key('lockedIn'),
-              color: Colors.transparent,
-              borderColor: FzColors.ok,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               child: Row(
                 children: [
                   const Icon(
                     Icons.lock_outline,
                     color: FzColors.ok,
-                    size: 18,
+                    size: 22,
                     semanticLabel: 'Locked in',
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: FzDirection(
                       text: mine.text,
                       child: Text(
                         mine.text.isEmpty ? '(no answer)' : mine.text,
-                        style: fz.h(18),
+                        style: fz.heading(),
                       ),
                     ),
                   ),
@@ -328,7 +335,7 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                         '$currentLength/${GameRules.answerMaxLength}',
                         style: fz.m(11, color: FzColors.dim),
                       ),
-                style: fz.h(18, weight: FontWeight.w700),
+                style: fz.h(20, weight: FontWeight.w600),
                 // Room below for the wagers, as the field scrolls into view.
                 scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
                 decoration: InputDecoration(
@@ -348,17 +355,9 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                 runSpacing: 8,
                 children: [
                   for (final w in state.you.wagerChoices)
-                    ChoiceChip(
+                    fzChoiceChip(
                       key: Key('wager-$w'),
-                      // At least the design's 48px, however short the number.
-                      label: ConstrainedBox(
-                        constraints: const BoxConstraints(minWidth: 22),
-                        child: Text(
-                          '$w',
-                          textAlign: TextAlign.center,
-                          style: fz.m(16),
-                        ),
-                      ),
+                      label: '$w',
                       tooltip: 'Wager $w',
                       selected: w == _wager,
                       onSelected: _timeUp
@@ -372,10 +371,10 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
               ),
             ],
           ],
-          const SizedBox(height: 22),
+          const SizedBox(height: 20),
           FzEyebrow('$answered of ${playing.length} answered'),
           if (mine != null || spectating) ...[
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             for (final player in playing)
               PlayerRow(
                 key: ValueKey('guess-${player.peerId}'),
@@ -391,15 +390,15 @@ class _QuestionViewState extends ConsumerState<QuestionView> {
                     : 'thinking',
                 trailing: player.answered
                     ? const Icon(
-                        Icons.check_circle,
+                        Icons.check,
                         color: FzColors.ok,
-                        size: 20,
+                        size: 22,
                         semanticLabel: 'Answered',
                       )
                     : const Icon(
-                        Icons.hourglass_empty,
+                        Icons.more_horiz,
                         color: FzColors.faint,
-                        size: 20,
+                        size: 22,
                         semanticLabel: 'Thinking',
                       ),
               ),
@@ -490,10 +489,7 @@ class QuestionImage extends StatelessWidget {
                       size: 28,
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      "The picture didn't load.",
-                      style: fz.m(12, color: FzColors.dim),
-                    ),
+                    Text("The picture didn't load.", style: fz.small(13)),
                   ],
                 ),
               ),
